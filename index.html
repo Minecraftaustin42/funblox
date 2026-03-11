@@ -193,6 +193,14 @@
             <div class="card" style="max-width: 500px; margin: 0 auto;">
                 <h2 class="card-title">User Settings</h2>
                 <div class="form-group">
+                    <label><strong>Status Message:</strong></label>
+                    <input type="text" id="setting-status" class="form-control mt-10" placeholder="Playing games" maxlength="80">
+                </div>
+                <div class="form-group">
+                    <label><strong>Profile Theme Color (25 SC):</strong></label>
+                    <input type="color" id="setting-theme-color" class="form-control mt-10" style="height:45px; padding:6px;">
+                </div>
+                <div class="form-group">
                     <label><strong>Change Username:</strong></label>
                     <input type="text" id="setting-username" class="form-control mt-10" placeholder="New username">
                 </div>
@@ -201,6 +209,10 @@
                     <input type="password" id="setting-password" class="form-control mt-10" placeholder="Leave blank to keep current password">
                 </div>
                 <button class="btn btn-success mt-10" onclick="saveSettings()">Save Changes</button>
+                <div class="form-group mt-20">
+                    <label><strong>Recent Logins:</strong></label>
+                    <div id="settings-login-history" style="font-size:12px; margin-top:8px;"></div>
+                </div>
             </div>
         </div>
 
@@ -446,6 +458,11 @@
             </div>
             
             <div class="card mt-20">
+                <h2 class="card-title">📰 Recent Activity</h2>
+                <div id="activity-feed-list"></div>
+            </div>
+
+            <div class="card mt-20">
                 <h2 class="card-title">⭐ Saved Games</h2>
                 <div id="saved-games-grid" class="game-grid"></div>
             </div>
@@ -535,6 +552,7 @@
                 </div>
                 
                 <div style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
+                    <p style="margin: 0;"><strong>Status:</strong> <span id="prof-status">No status set.</span></p>
                     <p style="font-size: 16px; color: #f39c12; font-weight: bold; margin: 0;">💰 <span id="prof-coins">0</span> SC</p>
                     <p style="margin: 0;"><strong>Followers:</strong> <span id="prof-followers-count">0</span></p>
                     <p style="margin: 0;"><strong>Games:</strong> <span id="prof-count">0</span></p>
@@ -639,6 +657,7 @@
                             <span style="font-size: 14px; font-weight: bold; color: #3498db;">▶️ <span id="play-count">0</span> Plays</span>
                             <button id="btn-like-game" class="btn btn-sm" style="background-color: #e84393; border-bottom-color: #d63031;" onclick="toggleGameLike()">❤️ Like (<span id="play-likes">0</span>)</button>
                             <button id="btn-save-game" class="btn btn-sm btn-info" onclick="toggleBookmarkFromPlay()">⭐ Save</button>
+                            <button class="btn btn-sm btn-dark" onclick="copyGameLink()">🔗 Copy Link</button>
                             <button class="btn btn-sm" onclick="navigate('library')">Exit Game</button>
                         </div>
                     </div>
@@ -802,18 +821,23 @@
             const headers = { 'Content-Type': 'application/json' };
             const token = localStorage.getItem('ps_token');
             if (token) headers['Authorization'] = token;
-            
+
             const config = { method, headers };
             if (body) config.body = JSON.stringify(body);
             try {
                 const res = await fetch(API_BASE + endpoint, config);
-                const data = await res.json();
+                const raw = await res.text();
+                let data = {};
+                try {
+                    data = raw ? JSON.parse(raw) : {};
+                } catch (parseErr) {
+                    throw new Error('Server returned non-JSON response.');
+                }
                 if (!res.ok) throw new Error(data.error || 'Server Error');
-                
-                // Keep frontend currencies up to date
+
                 if (data.coins !== undefined && currentUser) { currentUser.coins = data.coins; updateCoinsUI(); }
                 if (data.boosts !== undefined && currentUser) { currentUser.boosts = data.boosts; updateCoinsUI(); }
-                
+
                 return data;
             } catch (err) {
                 showModal('Error', err.message);
@@ -1030,7 +1054,12 @@
             } else if (viewId === 'messages') {
                 loadMessages();
             } else if (viewId === 'settings') {
-                if (currentUser) document.getElementById('setting-username').value = currentUser.username;
+                if (currentUser) {
+                    document.getElementById('setting-username').value = currentUser.username;
+                    document.getElementById('setting-status').value = currentUser.statusMessage || '';
+                    document.getElementById('setting-theme-color').value = currentUser.profileThemeColor || '#ffffff';
+                    loadLoginHistory();
+                }
             } else if (viewId === 'create') {
                 if (!currentEditGameId) {
                     setTimeout(() => { 
@@ -1079,13 +1108,23 @@
             } else {
                 navigate('landing');
             }
+
+            const hash = window.location.hash || '';
+            if (hash.startsWith('#join-private=') && currentUser) {
+                const token = hash.split('=')[1];
+                try {
+                    const joinRes = await apiCall(`/private-servers/join/${token}`, 'POST');
+                    window.location.hash = '';
+                    loadGame(joinRes.gameId, 'private-invite');
+                } catch (e) {}
+            }
         };
 
         const signup = async () => {
             const user = document.getElementById('signup-user').value;
             const pass = document.getElementById('signup-pass').value;
             try {
-                const data = await apiCall('/signup', 'POST', { username: user, password: pass });
+                const data = await apiCall('/signup', 'POST', { username: user, password: pass, device: navigator.userAgent });
                 localStorage.setItem('ps_token', data.token);
                 currentUser = data;
                 updateNav(); navigate('dashboard');
@@ -1097,7 +1136,7 @@
             const user = document.getElementById('login-user').value;
             const pass = document.getElementById('login-pass').value;
             try {
-                const data = await apiCall('/login', 'POST', { username: user, password: pass });
+                const data = await apiCall('/login', 'POST', { username: user, password: pass, device: navigator.userAgent });
                 localStorage.setItem('ps_token', data.token);
                 currentUser = data;
                 updateNav(); navigate('dashboard');
@@ -1113,17 +1152,39 @@
             }
         };
 
+        const loadLoginHistory = async () => {
+            try {
+                const rows = await apiCall('/me/login-history');
+                const el = document.getElementById('settings-login-history');
+                el.innerHTML = rows.length === 0 ? '<p style="color:#777;">No recent logins.</p>' : '';
+                rows.forEach(r => {
+                    el.innerHTML += `<div style="padding:6px 0; border-bottom:1px solid #eee;">${new Date(r.timestamp).toLocaleString()} — ${r.device}</div>`;
+                });
+            } catch (e) {}
+        };
+
         const saveSettings = async () => {
             const newUsername = document.getElementById('setting-username').value.trim();
             const newPassword = document.getElementById('setting-password').value;
+            const statusMessage = document.getElementById('setting-status').value.trim();
+            const themeColor = document.getElementById('setting-theme-color').value;
             try {
                 const res = await apiCall('/me/settings', 'PUT', { newUsername, newPassword });
+                await apiCall('/me/status', 'PUT', { statusMessage });
+
+                if (currentUser && currentUser.profileThemeColor !== themeColor) {
+                    const themeRes = await apiCall('/me/theme-color', 'PUT', { color: themeColor });
+                    currentUser.profileThemeColor = themeRes.profileThemeColor;
+                }
+
                 showModal('Success', res.message);
-                if (res.username && currentUser) {
-                    currentUser.username = res.username;
+                if (currentUser) {
+                    if (res.username) currentUser.username = res.username;
+                    currentUser.statusMessage = statusMessage;
                     updateNav();
                 }
                 document.getElementById('setting-password').value = '';
+                loadLoginHistory();
             } catch (e) {}
         };
 
@@ -1635,7 +1696,9 @@
                 document.getElementById('prof-count').innerText = profile.gamesCreated;
                 document.getElementById('prof-followers-count').innerText = profile.followersCount;
                 document.getElementById('prof-online-dot').className = `status-dot ${profile.isOnline ? 'online' : 'offline'}`;
+                document.getElementById('prof-status').innerText = profile.statusMessage || 'No status set.';
                 document.getElementById('prof-coins').innerText = localStorage.getItem('sc_' + profile.id) || '0';
+                document.querySelector('#view-profile .card').style.background = profile.profileThemeColor || '#ffffff';
 
                 const banner = document.getElementById('prof-primary-group-banner');
                 if (profile.primaryGroup) {
@@ -2081,6 +2144,13 @@
                 const eGrid = document.getElementById('editable-games-grid');
                 eGrid.innerHTML = games.length === 0 ? '<p>You have no games. Go create one!</p>' : '';
                 games.forEach(g => eGrid.innerHTML += renderGameCard(g, true));
+
+                const activity = await apiCall('/activity');
+                const activityList = document.getElementById('activity-feed-list');
+                activityList.innerHTML = activity.length === 0 ? '<p>No recent activity yet.</p>' : '';
+                activity.slice(0, 10).forEach(a => {
+                    activityList.innerHTML += `<div class="list-item"><div>${a.text}</div><small style="color:#888;">${new Date(a.timestamp).toLocaleTimeString()}</small></div>`;
+                });
 
                 const recGrid = document.getElementById('recent-games-grid');
                 recGrid.innerHTML = myData.recentlyPlayed.length === 0 ? '<p>You haven\'t played any games recently.</p>' : '';
@@ -2539,28 +2609,27 @@
                 
                 // Load Servers Tab Info
                 const pubList = document.getElementById('play-public-servers');
-                pubList.innerHTML = game.activeServers.public.length === 0 ? '<p>No active public servers.</p>' : '';
-                game.activeServers.public.forEach(s => {
-                    pubList.innerHTML += `<div class="list-item" style="background:#fff; margin-bottom:5px;">
-                        <span>Server ID: ${s.id.substring(4, 9)}... (${s.players}/${s.max} Players)</span>
-                        <button class="btn btn-sm btn-success" onclick="startGame('${s.id}')">Join</button>
-                    </div>`;
-                });
+                pubList.innerHTML = `<div class="list-item" style="background:#fff; margin-bottom:5px;"><span>Main Public Server</span><button class="btn btn-sm btn-success" onclick="startGame()">Join</button></div>`;
 
                 const psContainer = document.getElementById('play-private-servers-container');
-                if (game.psEnabled) {
-                    psContainer.style.display = 'block';
-                    if (game.myPrivateServer) {
-                        document.getElementById('play-ps-mine').style.display = 'block';
-                        document.getElementById('play-ps-purchase').style.display = 'none';
-                        document.getElementById('play-ps-mine').innerHTML = `<p style="margin:0 0 10px 0;"><strong>Your Private Server</strong></p><button class="btn btn-success btn-sm" onclick="startGame('priv_${game.myPrivateServer.id}')">Join</button>`;
-                    } else {
-                        document.getElementById('play-ps-mine').style.display = 'none';
-                        document.getElementById('play-ps-purchase').style.display = 'block';
-                        document.getElementById('play-ps-price').innerText = game.psPrice > 0 ? game.psPrice + ' SC' : 'Free';
-                    }
+                psContainer.style.display = 'block';
+                const privateServers = await apiCall(`/games/${game.id}/private-servers`);
+                const mine = privateServers.find(ps => ps.isOwner);
+
+                if (mine) {
+                    document.getElementById('play-ps-mine').style.display = 'block';
+                    document.getElementById('play-ps-purchase').style.display = 'none';
+                    document.getElementById('play-ps-mine').innerHTML = `<p style="margin:0 0 10px 0;"><strong>Your Private Server</strong> (${mine.joinEnabled ? 'Join Enabled' : 'Join Disabled'})</p>
+                        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                            <button class="btn btn-success btn-sm" onclick="startGame('priv_${mine.id}')">Join</button>
+                            <button class="btn btn-info btn-sm" onclick="copyPrivateInvite('${mine.id}')">Copy Invite (3h)</button>
+                            <button class="btn btn-warning btn-sm" onclick="togglePrivateJoin('${mine.id}', ${!mine.joinEnabled})">${mine.joinEnabled ? 'Disable Join' : 'Enable Join'}</button>
+                            <button class="btn btn-dark btn-sm" onclick="promptAddPrivateMember('${mine.id}')">Add Member</button>
+                            <button class="btn btn-danger btn-sm" onclick="promptRemovePrivateMember('${mine.id}')">Remove Member</button>
+                        </div>`;
                 } else {
-                    psContainer.style.display = 'none';
+                    document.getElementById('play-ps-mine').style.display = 'none';
+                    document.getElementById('play-ps-purchase').style.display = 'block';
                 }
 
                 // Load update log
@@ -2589,13 +2658,72 @@
             } catch(e) {}
         };
 
+        const copyGameLink = async () => {
+            if (!currentPlayGameId) return;
+            const url = `${window.location.origin}${window.location.pathname}#game=${currentPlayGameId}`;
+            try {
+                await navigator.clipboard.writeText(url);
+                showModal('Copied', 'Game link copied to clipboard.');
+            } catch (e) {
+                showModal('Copy Failed', 'Clipboard access not available.');
+            }
+        };
+
         const buyPrivateServer = async () => {
             if(!currentPlayGameId) return;
             try {
-                await apiCall(`/games/${currentPlayGameId}/buy-ps`, 'POST');
-                showModal('Success', 'Private server purchased!');
+                await apiCall(`/games/${currentPlayGameId}/private-servers`, 'POST');
+                showModal('Success', 'Private server ready!');
                 loadGame(currentPlayGameId, 'reload');
             } catch(e) {}
+        };
+
+        const copyPrivateInvite = async (serverId) => {
+            try {
+                const res = await apiCall(`/private-servers/${serverId}/invite-link`, 'POST');
+                const url = `${window.location.origin}${window.location.pathname}#join-private=${res.token}`;
+                await navigator.clipboard.writeText(url);
+                showModal('Copied', 'Private invite copied. Expires in 3 hours.');
+            } catch (e) {}
+        };
+
+        const togglePrivateJoin = async (serverId, joinEnabled) => {
+            try {
+                await apiCall(`/private-servers/${serverId}/join-enabled`, 'PUT', { joinEnabled });
+                loadGame(currentPlayGameId, 'reload');
+            } catch (e) {}
+        };
+
+        const promptAddPrivateMember = (serverId) => {
+            showModal('Add Private Server Member', 'Enter username:', 'Add', async (username) => {
+                if (!username) return;
+                try {
+                    await apiCall(`/private-servers/${serverId}/members`, 'POST', { username });
+                    showModal('Done', 'Member added.');
+                } catch (e) {}
+            }, true, true);
+        };
+
+        const promptRemovePrivateMember = (serverId) => {
+            showModal('Remove Member', 'Enter member user ID to remove:', 'Remove', async (memberId) => {
+                if (!memberId) return;
+                try {
+                    await apiCall(`/private-servers/${serverId}/members/${memberId}`, 'DELETE');
+                    showModal('Done', 'Member removed.');
+                    loadGame(currentPlayGameId, 'reload');
+                } catch (e) {}
+            }, true, true);
+        };
+
+
+        const joinPrivateServer = async () => {
+            if (!currentPlayGameId) return;
+            try {
+                const servers = await apiCall(`/games/${currentPlayGameId}/private-servers`);
+                const target = servers.find(s => s.canJoin);
+                if (!target) return showModal('Unavailable', 'No private server available to join.');
+                startGame(`priv_${target.id}`);
+            } catch (e) {}
         };
 
         const postGameUpdate = async () => {
