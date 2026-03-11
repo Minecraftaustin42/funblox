@@ -7,7 +7,10 @@ const app = express();
 const PORT = 3000;
 
 app.use(express.json({ limit: '10mb' })); 
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(__dirname));
+
+const MAX_ACTIVITY_ITEMS = 40;
+const PRIVATE_SERVER_LINK_TTL_MS = 3 * 60 * 60 * 1000;
 
 // In-memory databases
 const DB_FILE = path.join(__dirname, 'db.json');
@@ -16,7 +19,8 @@ let db = {
     sessions: {}, 
     games: [], 
     shopItems: [],
-    groups: [] 
+    groups: [],
+    activity: [] 
 };
 
 let activeEditors = {}; 
@@ -31,6 +35,7 @@ if (fs.existsSync(DB_FILE)) {
         
         if (!db.shopItems) db.shopItems = [];
         if (!db.groups) db.groups = [];
+        if (!db.activity) db.activity = [];
 
         db.users.forEach(u => { 
             if (!u.followers) u.followers = []; 
@@ -45,6 +50,16 @@ if (fs.existsSync(DB_FILE)) {
             if (typeof u.equipped === 'undefined') u.equipped = null;
             if (typeof u.primaryGroupId === 'undefined') u.primaryGroupId = null; 
             if (typeof u.coins === 'undefined') u.coins = 0; // Migrate coins to backend
+            if (typeof u.statusMessage === 'undefined') u.statusMessage = '';
+            if (typeof u.profileThemeColor === 'undefined') u.profileThemeColor = '#ffffff';
+            if (!u.loginHistory) u.loginHistory = [];
+            if (typeof u.boosts === 'undefined') u.boosts = 0;
+            if (typeof u.bio === 'undefined') u.bio = '';
+            if (typeof u.joinDate === 'undefined') u.joinDate = new Date().toISOString();
+            if (typeof u.totalPlayTimeMs === 'undefined') u.totalPlayTimeMs = 0;
+            if (!u.gamePlayTime) u.gamePlayTime = {};
+            if (typeof u.lastDailyRewardAt === 'undefined') u.lastDailyRewardAt = 0;
+            if (typeof u.dailyStreak === 'undefined') u.dailyStreak = 0;
             
             if (u.friends.length > 0 && typeof u.friends[0] === 'string') {
                 u.friends = u.friends.map(id => ({ id, addedAt: Date.now() }));
@@ -58,6 +73,11 @@ if (fs.existsSync(DB_FILE)) {
             if (!g.updates) g.updates = []; 
             if (!g.genre) g.genre = 'Sandbox'; 
             if (typeof g.groupId === 'undefined') g.groupId = null;
+            if (!g.privateServers) g.privateServers = [];
+            if (typeof g.boosts === 'undefined') g.boosts = 0;
+            if (typeof g.boostedAt === 'undefined') g.boostedAt = 0;
+            if (typeof g.description === 'undefined') g.description = '';
+            if (typeof g.thumbnail === 'undefined') g.thumbnail = '';
         });
 
         // Migrate Groups to advanced roles system
@@ -138,10 +158,21 @@ const addGroupXp = (group, amount) => {
     group.level = Math.floor(group.xp / 200) + 1;
 };
 
+
+const pushActivity = (entry) => {
+    db.activity.unshift({ id: crypto.randomUUID(), timestamp: Date.now(), ...entry });
+    if (db.activity.length > MAX_ACTIVITY_ITEMS) db.activity = db.activity.slice(0, MAX_ACTIVITY_ITEMS);
+};
+
+const sanitizeDevice = (device) => {
+    if (!device || typeof device !== 'string') return 'Unknown Device';
+    return device.trim().substring(0, 80) || 'Unknown Device';
+};
+
 // --- Routes ---
 
 app.post('/api/signup', (req, res) => {
-    const { username, password } = req.body;
+    const { username, password, device } = req.body;
     if (!username || !password || username.length < 3 || password.length < 5) {
         return res.status(400).json({ error: 'Invalid username or password length.' });
     }
@@ -154,37 +185,45 @@ app.post('/api/signup', (req, res) => {
         id: crypto.randomUUID(), username, salt, hash,
         followers: [], friends: [], friendRequests: [],
         color: '#e74c3c', recentlyPlayed: [], badges: [], messages: [],
-        inventory: [], bookmarks: [], equipped: null, primaryGroupId: null, coins: 0
+        inventory: [], bookmarks: [], equipped: null, primaryGroupId: null, coins: 0,
+        statusMessage: '', profileThemeColor: '#ffffff', loginHistory: [],
+        boosts: 0, bio: '', joinDate: new Date().toISOString(), totalPlayTimeMs: 0, gamePlayTime: {}, lastDailyRewardAt: 0, dailyStreak: 0
     };
+    newUser.loginHistory.unshift({ timestamp: Date.now(), device: sanitizeDevice(device) });
     db.users.push(newUser);
     
     const token = crypto.randomBytes(32).toString('hex');
     db.sessions[token] = newUser.id;
     onlineUsers[newUser.id] = Date.now();
     saveDB();
-    res.json({ token, username: newUser.username, userId: newUser.id, color: newUser.color, equipped: newUser.equipped, coins: newUser.coins });
+    res.json({ token, username: newUser.username, userId: newUser.id, color: newUser.color, equipped: newUser.equipped, coins: newUser.coins, boosts: newUser.boosts });
 });
 
 app.post('/api/login', (req, res) => {
-    const { username, password } = req.body;
+    const { username, password, device } = req.body;
     const user = db.users.find(u => u.username.toLowerCase() === username.toLowerCase());
     
     if (!user || !verifyPassword(password, user.salt, user.hash)) {
         return res.status(401).json({ error: 'Invalid username or password.' });
     }
 
+    if (!user.loginHistory) user.loginHistory = [];
+    user.loginHistory.unshift({ timestamp: Date.now(), device: sanitizeDevice(device) });
+    if (user.loginHistory.length > 8) user.loginHistory = user.loginHistory.slice(0, 8);
+
     const token = crypto.randomBytes(32).toString('hex');
     db.sessions[token] = user.id;
     onlineUsers[user.id] = Date.now();
     saveDB();
 
-    res.json({ token, username: user.username, userId: user.id, color: user.color, equipped: user.equipped, coins: user.coins });
+    res.json({ token, username: user.username, userId: user.id, color: user.color, equipped: user.equipped, coins: user.coins, boosts: user.boosts });
 });
 
 app.get('/api/restore', requireAuth, (req, res) => {
     const user = db.users.find(u => u.id === req.userId);
+
     if(!user) return res.status(404).json({ error: "User not found" });
-    res.json({ token: req.headers.authorization, username: user.username, userId: user.id, color: user.color, equipped: user.equipped, coins: user.coins });
+    res.json({ token: req.headers.authorization, username: user.username, userId: user.id, color: user.color, equipped: user.equipped, coins: user.coins, boosts: user.boosts, statusMessage: user.statusMessage || '', profileThemeColor: user.profileThemeColor || '#ffffff', bio: user.bio || '' });
 });
 
 app.post('/api/logout', requireAuth, (req, res) => {
@@ -300,9 +339,10 @@ app.get('/api/me', requireAuth, (req, res) => {
     });
 
     res.json({
-        id: user.id, username: user.username, color: user.color, badges: user.badges, coins: user.coins,
+        id: user.id, username: user.username, color: user.color, badges: user.badges, coins: user.coins, boosts: user.boosts || 0,
+        statusMessage: user.statusMessage || '', profileThemeColor: user.profileThemeColor || '#ffffff', bio: user.bio || '', joinDate: user.joinDate,
         requests, friends: friendsList, recentlyPlayed: recentGames, bookmarkedGames, 
-        unreadMessages: (user.messages || []).length, equipped: user.equipped, myGroups
+        unreadMessages: (user.messages || []).length, equipped: user.equipped, myGroups, totalPlayTimeMs: user.totalPlayTimeMs || 0
     });
 });
 
@@ -311,6 +351,55 @@ app.put('/api/me/color', requireAuth, (req, res) => {
     user.color = req.body.color || '#e74c3c';
     saveDB();
     res.json({ success: true, color: user.color });
+});
+
+
+app.put('/api/me/status', requireAuth, (req, res) => {
+    const user = db.users.find(u => u.id === req.userId);
+    const statusMessage = (req.body.statusMessage || '').toString().trim().substring(0, 80);
+    user.statusMessage = statusMessage;
+    saveDB();
+    res.json({ success: true, statusMessage: user.statusMessage });
+});
+
+app.put('/api/me/theme-color', requireAuth, (req, res) => {
+    const user = db.users.find(u => u.id === req.userId);
+    const color = (req.body.color || '').toString();
+    if (!/^#[0-9a-fA-F]{6}$/.test(color)) return res.status(400).json({ error: 'Invalid color.' });
+    if (user.coins < 25) return res.status(400).json({ error: 'Need 25 SculptCoins to change profile theme.' });
+
+    user.coins -= 25;
+    user.profileThemeColor = color;
+    saveDB();
+    res.json({ success: true, profileThemeColor: user.profileThemeColor, coins: user.coins });
+});
+
+app.get('/api/me/login-history', requireAuth, (req, res) => {
+    const user = db.users.find(u => u.id === req.userId);
+    res.json((user.loginHistory || []).slice(0, 8));
+});
+
+app.put('/api/me/bio', requireAuth, (req, res) => {
+    const user = db.users.find(u => u.id === req.userId);
+    user.bio = (req.body.bio || '').toString().trim().substring(0, 220);
+    saveDB();
+    res.json({ success: true, bio: user.bio });
+});
+
+app.get('/api/activity', requireAuth, (req, res) => {
+    const feed = (db.activity || []).slice(0, 15).map(item => {
+        if (item.type === 'friend_played') {
+            return { ...item, text: `${item.username} played ${item.gameTitle}` };
+        }
+        if (item.type === 'game_published') {
+            return { ...item, text: `${item.username} published ${item.gameTitle}` };
+        }
+        if (item.type === 'game_liked') {
+            return { ...item, text: `${item.username} liked ${item.gameTitle}` };
+        }
+        return { ...item, text: 'Activity update' };
+    });
+    res.json(feed);
 });
 
 app.post('/api/me/equip', requireAuth, (req, res) => {
@@ -365,6 +454,8 @@ app.get('/api/users/:username', (req, res) => {
 
     res.json({
         id: user.id, username: user.username, isOnline: isUserOnline(user.id), color: user.color, badges: user.badges,
+        statusMessage: user.statusMessage || '', profileThemeColor: user.profileThemeColor || '#ffffff',
+        bio: user.bio || '', joinDate: user.joinDate, totalPlayTimeMs: user.totalPlayTimeMs || 0,
         followersCount: user.followers.length, isFollowing, friendStatus, friends: friendsDetails,
         gamesCreated: userGames.length,
         games: userGames.map(g => ({ id: g.id, title: g.title, authorName: g.authorName, genre: g.genre, likes: g.likes.length, plays: g.plays, groupId: g.groupId })),
@@ -764,8 +855,9 @@ app.post('/api/shop/buy/:id', requireAuth, (req, res) => {
 // --- Game Routes ---
 
 app.post('/api/games', requireAuth, (req, res) => {
-    const { title, gameData, genre, groupId } = req.body;
+    const { title, gameData, genre, groupId, description, thumbnail } = req.body;
     if (!title || !gameData) return res.status(400).json({ error: 'Missing game data.' });
+    if (thumbnail && thumbnail.length > 1_400_000) return res.status(400).json({ error: 'Thumbnail too large (max ~1MB).' });
     
     const user = db.users.find(u => u.id === req.userId);
     let authorName = user.username;
@@ -782,9 +874,13 @@ app.post('/api/games', requireAuth, (req, res) => {
     const newGame = {
         id: crypto.randomUUID(), title, authorId: user.id, authorName: authorName, genre: genre || 'Sandbox',
         groupId: groupId || null,
-        gameData, lastEditTime: Date.now(), collaborators: [], likes: [], plays: 0, updates: [], createdAt: new Date().toISOString()
+        gameData, lastEditTime: Date.now(), collaborators: [], likes: [], plays: 0, updates: [], privateServers: [], boosts: 0, boostedAt: 0,
+        description: (description || '').toString().substring(0, 1000),
+        thumbnail: (thumbnail || '').toString().substring(0, 1_400_000),
+        createdAt: new Date().toISOString()
     };
     db.games.push(newGame);
+    pushActivity({ type: 'game_published', userId: user.id, username: user.username, gameId: newGame.id, gameTitle: newGame.title });
     awardBadge(req.userId, 'Creator');
     saveDB();
     res.json({ message: 'Game saved successfully!', gameId: newGame.id });
@@ -797,7 +893,7 @@ app.get('/api/games', (req, res) => {
         .filter(g => query === '' || g.title.toLowerCase().includes(query))
         .filter(g => genre === 'All' || g.genre === genre)
         .map(g => ({
-            id: g.id, title: g.title, authorName: g.authorName, genre: g.genre, likes: g.likes.length, plays: g.plays, groupId: g.groupId, createdAt: g.createdAt
+            id: g.id, title: g.title, authorName: g.authorName, genre: g.genre, likes: g.likes.length, plays: g.plays, groupId: g.groupId, createdAt: g.createdAt, description: g.description || '', thumbnail: g.thumbnail || '', boosts: g.boosts || 0
         })).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     res.json(publicGames);
 });
@@ -806,7 +902,7 @@ app.get('/api/games/trending', (req, res) => {
     const trending = [...db.games]
         .sort((a, b) => (b.plays + b.likes.length * 2) - (a.plays + a.likes.length * 2))
         .slice(0, 4)
-        .map(g => ({ id: g.id, title: g.title, authorName: g.authorName, genre: g.genre, likes: g.likes.length, plays: g.plays, groupId: g.groupId }));
+        .map(g => ({ id: g.id, title: g.title, authorName: g.authorName, genre: g.genre, likes: g.likes.length, plays: g.plays, groupId: g.groupId, description: g.description || '', thumbnail: g.thumbnail || '', boosts: g.boosts || 0 }));
     res.json(trending);
 });
 
@@ -814,7 +910,7 @@ app.get('/api/games/most-liked', (req, res) => {
     const mostLiked = [...db.games]
         .sort((a, b) => b.likes.length - a.likes.length)
         .slice(0, 4)
-        .map(g => ({ id: g.id, title: g.title, authorName: g.authorName, genre: g.genre, likes: g.likes.length, plays: g.plays, groupId: g.groupId }));
+        .map(g => ({ id: g.id, title: g.title, authorName: g.authorName, genre: g.genre, likes: g.likes.length, plays: g.plays, groupId: g.groupId, description: g.description || '', thumbnail: g.thumbnail || '', boosts: g.boosts || 0 }));
     res.json(mostLiked);
 });
 
@@ -826,7 +922,7 @@ app.get('/api/games/fresh', (req, res) => {
             return tB - tA;
         })
         .slice(0, 4)
-        .map(g => ({ id: g.id, title: g.title, authorName: g.authorName, genre: g.genre, likes: g.likes.length, plays: g.plays, groupId: g.groupId }));
+        .map(g => ({ id: g.id, title: g.title, authorName: g.authorName, genre: g.genre, likes: g.likes.length, plays: g.plays, groupId: g.groupId, description: g.description || '', thumbnail: g.thumbnail || '', boosts: g.boosts || 0 }));
     res.json(fresh);
 });
 
@@ -860,7 +956,8 @@ app.get('/api/games/:id', (req, res) => {
         const user = db.users.find(u => u.id === userId);
         if (user && user.bookmarks.includes(game.id)) isBookmarked = true;
     }
-    res.json({ ...game, likesCount: game.likes.length, isLiked, isBookmarked, updates: game.updates || [] });
+    const { privateServers, ...safeGame } = game;
+    res.json({ ...safeGame, likesCount: game.likes.length, isLiked, isBookmarked, updates: game.updates || [], activeServers: { public: [] } });
 });
 
 app.post('/api/games/:id/updates', requireAuth, (req, res) => {
@@ -905,6 +1002,7 @@ app.post('/api/games/:id/play', requireAuth, (req, res) => {
     user.recentlyPlayed.unshift({ gameId, timestamp: Date.now() });
     if (user.recentlyPlayed.length > 8) user.recentlyPlayed.pop();
 
+    pushActivity({ type: 'friend_played', userId: user.id, username: user.username, gameId: game.id, gameTitle: game.title });
     awardBadge(req.userId, 'Gamer');
     saveDB();
     res.json({ success: true, coins: user.coins });
@@ -920,6 +1018,7 @@ app.post('/api/games/:id/like', requireAuth, (req, res) => {
     } else {
         game.likes.push(req.userId);
         isLiked = true;
+        pushActivity({ type: 'game_liked', userId: req.userId, username: db.users.find(u => u.id === req.userId)?.username || 'Someone', gameId: game.id, gameTitle: game.title });
         awardBadge(req.userId, 'Critic');
     }
     saveDB();
@@ -974,7 +1073,7 @@ app.post('/api/games/:id/sync', requireAuth, (req, res) => {
 
     if (!canEdit) return res.status(403).json({ error: 'Not authorized.' });
 
-    const { gameData, genre, lastLocalEditTime } = req.body;
+    const { gameData, genre, lastLocalEditTime, description, thumbnail } = req.body;
     if (!activeEditors[game.id]) activeEditors[game.id] = {};
     activeEditors[game.id][req.userId] = Date.now();
 
@@ -990,6 +1089,9 @@ app.post('/api/games/:id/sync', requireAuth, (req, res) => {
     if (gameData && lastLocalEditTime > game.lastEditTime) {
         game.gameData = gameData;
         if (genre) game.genre = genre;
+        if (typeof description !== 'undefined') game.description = (description || '').toString().substring(0, 1000);
+        if (thumbnail && thumbnail.length > 1_400_000) return res.status(400).json({ error: 'Thumbnail too large (max ~1MB).' });
+        if (typeof thumbnail !== 'undefined') game.thumbnail = (thumbnail || '').toString();
         game.lastEditTime = lastLocalEditTime;
         saveDB(); appliedUpdate = true;
     }
@@ -999,8 +1101,16 @@ app.post('/api/games/:id/sync', requireAuth, (req, res) => {
 
 app.post('/api/games/:id/play-sync', requireAuth, (req, res) => {
     const gameId = req.params.id;
-    const { x, y, z, rotY, sceneId, color } = req.body;
+    const { x, y, z, rotY, sceneId, color, requestedInstanceId } = req.body;
     const user = db.users.find(u => u.id === req.userId);
+
+    if (requestedInstanceId && requestedInstanceId.startsWith('priv_')) {
+        const privateId = requestedInstanceId.replace('priv_', '');
+        const game = db.games.find(g => g.id === gameId);
+        const server = game ? (game.privateServers || []).find(ps => ps.id === privateId) : null;
+        if (!server) return res.status(404).json({ error: 'Private server not found.' });
+        if (!(server.members || []).includes(req.userId)) return res.status(403).json({ error: 'Not invited to this private server.' });
+    }
 
     if (!activePlayers[gameId]) activePlayers[gameId] = {};
     activePlayers[gameId][req.userId] = { 
@@ -1021,8 +1131,194 @@ app.post('/api/games/:id/play-sync', requireAuth, (req, res) => {
     res.json(others);
 });
 
+
+
+
+
+app.post('/api/me/daily-reward', requireAuth, (req, res) => {
+    const user = db.users.find(u => u.id === req.userId);
+    const now = Date.now();
+    const dayMs = 24 * 60 * 60 * 1000;
+    if (user.lastDailyRewardAt && (now - user.lastDailyRewardAt) < dayMs) {
+        return res.json({ rewarded: false, streak: user.dailyStreak || 0, earnedBoosts: 0, earnedCoins: 0, milestone: false, boosts: user.boosts, coins: user.coins });
+    }
+
+    const gap = now - (user.lastDailyRewardAt || 0);
+    user.dailyStreak = (gap < dayMs * 2 && user.lastDailyRewardAt) ? (user.dailyStreak || 0) + 1 : 1;
+    const rewardBoosts = 3;
+    const rewardCoins = 25;
+    const milestone = user.dailyStreak % 7 === 0;
+    user.boosts = (user.boosts || 0) + rewardBoosts;
+    user.coins = (user.coins || 0) + rewardCoins + (milestone ? 300 : 0);
+    user.lastDailyRewardAt = now;
+    saveDB();
+    res.json({ rewarded: true, streak: user.dailyStreak, earnedBoosts: rewardBoosts, earnedCoins: rewardCoins + (milestone ? 300 : 0), milestone, boosts: user.boosts, coins: user.coins });
+});
+
+app.post('/api/games/:id/boost', requireAuth, (req, res) => {
+    const user = db.users.find(u => u.id === req.userId);
+    const game = db.games.find(g => g.id === req.params.id);
+    if (!game) return res.status(404).json({ error: 'Game not found.' });
+    if ((user.boosts || 0) < 5) return res.status(400).json({ error: 'Not enough boosts.' });
+    user.boosts -= 5;
+    game.boosts = (game.boosts || 0) + 1;
+    game.boostedAt = Date.now();
+    saveDB();
+    res.json({ success: true, boosts: user.boosts, gameBoosts: game.boosts });
+});
+
+app.get('/api/games/launchpad', (req, res) => {
+    const data = [...db.games]
+        .filter(g => (g.boosts || 0) > 0)
+        .sort((a,b) => ((b.boosts || 0) * 10000000000000 + (b.boostedAt || 0)) - ((a.boosts || 0) * 10000000000000 + (a.boostedAt || 0)))
+        .slice(0, 8)
+        .map(g => ({ id: g.id, title: g.title, authorName: g.authorName, boosts: g.boosts || 0, thumbnail: g.thumbnail || '' }));
+    res.json(data);
+});
+
+app.post('/api/games/:id/play-time', requireAuth, (req, res) => {
+    const game = db.games.find(g => g.id === req.params.id);
+    if (!game) return res.status(404).json({ error: 'Game not found.' });
+    const user = db.users.find(u => u.id === req.userId);
+    let durationMs = Number(req.body.durationMs || 0);
+    if (!Number.isFinite(durationMs) || durationMs <= 0) return res.json({ success: true, totalPlayTimeMs: user.totalPlayTimeMs || 0 });
+    durationMs = Math.min(durationMs, 4 * 60 * 60 * 1000);
+    user.totalPlayTimeMs = (user.totalPlayTimeMs || 0) + durationMs;
+    if (!user.gamePlayTime) user.gamePlayTime = {};
+    user.gamePlayTime[game.id] = (user.gamePlayTime[game.id] || 0) + durationMs;
+    saveDB();
+    res.json({ success: true, totalPlayTimeMs: user.totalPlayTimeMs });
+});
+
+app.get('/api/games/:id/private-servers', requireAuth, (req, res) => {
+    const game = db.games.find(g => g.id === req.params.id);
+    if (!game) return res.status(404).json({ error: 'Game not found.' });
+    if (!game.privateServers) game.privateServers = [];
+
+    const myServers = game.privateServers
+        .filter(ps => ps.ownerId === req.userId || (ps.members || []).includes(req.userId))
+        .map(ps => ({
+            id: ps.id,
+            ownerId: ps.ownerId,
+            ownerName: db.users.find(u => u.id === ps.ownerId)?.username || 'Unknown',
+            joinEnabled: ps.joinEnabled !== false,
+            memberCount: (ps.members || []).length,
+            isOwner: ps.ownerId === req.userId,
+            canJoin: ps.ownerId === req.userId || ps.joinEnabled !== false || (ps.members || []).includes(req.userId)
+        }));
+
+    res.json(myServers);
+});
+
+app.post('/api/games/:id/private-servers', requireAuth, (req, res) => {
+    const game = db.games.find(g => g.id === req.params.id);
+    if (!game) return res.status(404).json({ error: 'Game not found.' });
+    if (!game.privateServers) game.privateServers = [];
+
+    const owned = game.privateServers.find(ps => ps.ownerId === req.userId);
+    if (owned) return res.json({ server: owned, message: 'Private server already exists.' });
+
+    const newServer = {
+        id: crypto.randomUUID(),
+        ownerId: req.userId,
+        members: [req.userId],
+        joinEnabled: true,
+        createdAt: Date.now(),
+        inviteLinks: []
+    };
+    game.privateServers.push(newServer);
+    saveDB();
+    res.json({ server: newServer, message: 'Private server created.' });
+});
+
+app.put('/api/private-servers/:serverId/join-enabled', requireAuth, (req, res) => {
+    let target = null;
+    let game = null;
+    for (const g of db.games) {
+        const found = (g.privateServers || []).find(ps => ps.id === req.params.serverId);
+        if (found) { target = found; game = g; break; }
+    }
+    if (!target || !game) return res.status(404).json({ error: 'Private server not found.' });
+    if (target.ownerId !== req.userId) return res.status(403).json({ error: 'Only owner can change this.' });
+
+    target.joinEnabled = !!req.body.joinEnabled;
+    saveDB();
+    res.json({ success: true, joinEnabled: target.joinEnabled });
+});
+
+app.post('/api/private-servers/:serverId/members', requireAuth, (req, res) => {
+    const username = (req.body.username || '').toString().trim();
+    const memberUser = db.users.find(u => u.username.toLowerCase() === username.toLowerCase());
+    if (!memberUser) return res.status(404).json({ error: 'User not found.' });
+
+    let target = null;
+    for (const g of db.games) {
+        const found = (g.privateServers || []).find(ps => ps.id === req.params.serverId);
+        if (found) { target = found; break; }
+    }
+    if (!target) return res.status(404).json({ error: 'Private server not found.' });
+    if (target.ownerId !== req.userId) return res.status(403).json({ error: 'Only owner can add members.' });
+
+    if (!target.members.includes(memberUser.id)) target.members.push(memberUser.id);
+    saveDB();
+    res.json({ success: true });
+});
+
+app.delete('/api/private-servers/:serverId/members/:memberId', requireAuth, (req, res) => {
+    let target = null;
+    for (const g of db.games) {
+        const found = (g.privateServers || []).find(ps => ps.id === req.params.serverId);
+        if (found) { target = found; break; }
+    }
+    if (!target) return res.status(404).json({ error: 'Private server not found.' });
+    if (target.ownerId !== req.userId) return res.status(403).json({ error: 'Only owner can remove members.' });
+    if (req.params.memberId === req.userId) return res.status(400).json({ error: 'Owner cannot be removed.' });
+
+    target.members = target.members.filter(id => id !== req.params.memberId);
+    saveDB();
+    res.json({ success: true });
+});
+
+app.post('/api/private-servers/:serverId/invite-link', requireAuth, (req, res) => {
+    let target = null;
+    let gameId = null;
+    for (const g of db.games) {
+        const found = (g.privateServers || []).find(ps => ps.id === req.params.serverId);
+        if (found) { target = found; gameId = g.id; break; }
+    }
+    if (!target) return res.status(404).json({ error: 'Private server not found.' });
+    if (target.ownerId !== req.userId) return res.status(403).json({ error: 'Only owner can create links.' });
+
+    if (!target.inviteLinks) target.inviteLinks = [];
+    const token = crypto.randomBytes(24).toString('hex');
+    const expiresAt = Date.now() + PRIVATE_SERVER_LINK_TTL_MS;
+    target.inviteLinks.unshift({ token, expiresAt, createdAt: Date.now() });
+    target.inviteLinks = target.inviteLinks.filter(link => link.expiresAt > Date.now()).slice(0, 8);
+    saveDB();
+    res.json({ token, gameId, expiresAt, shareUrl: `/join-private/${token}` });
+});
+
+app.post('/api/private-servers/join/:token', requireAuth, (req, res) => {
+    for (const g of db.games) {
+        for (const ps of (g.privateServers || [])) {
+            const link = (ps.inviteLinks || []).find(l => l.token === req.params.token);
+            if (!link) continue;
+            if (link.expiresAt <= Date.now()) return res.status(400).json({ error: 'Invite link expired.' });
+            if (ps.joinEnabled === false) return res.status(403).json({ error: 'Joining is currently disabled by owner.' });
+            if (!ps.members.includes(req.userId)) ps.members.push(req.userId);
+            saveDB();
+            return res.json({ success: true, serverId: ps.id, gameId: g.id });
+        }
+    }
+    res.status(404).json({ error: 'Invite link not found.' });
+});
+
+app.use('/api', (req, res) => {
+    res.status(404).json({ error: 'API route not found.' });
+});
+
 app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 app.listen(PORT, () => {
