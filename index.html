@@ -56,6 +56,11 @@
 
         .game-card { background: #fff; border: 1px solid #d8dee2; border-radius: 4px; padding: 15px; text-align: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05); position:relative; }
         .game-card h3 { margin: 0 0 10px 0; font-size: 18px; color: #333; }
+        .game-thumb { width: 100%; height: 110px; object-fit: cover; border-radius: 4px; margin-bottom: 8px; background:#eef2f5; border:1px solid #d8dee2; }
+        .iconic-loading { position: fixed; inset:0; background: linear-gradient(160deg,#1f2d3d,#2c3e50); color:#fff; display:none; align-items:center; justify-content:center; z-index:5000; }
+        .iconic-loading .box { text-align:center; max-width:360px; padding:20px; }
+        .iconic-loading .spinner { width:34px; height:34px; border:4px solid rgba(255,255,255,0.35); border-top-color:#fff; border-radius:50%; margin:12px auto 0; animation:spin 0.9s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg);} }
         .game-card p { margin: 0 0 5px 0; font-size: 13px; color: #777; }
         .game-actions { display: flex; justify-content: center; gap: 5px; margin-top: 10px; flex-wrap: wrap; }
         .game-stats { font-size:12px; color:#e84393; font-weight: 600; display:flex; justify-content:center; gap: 10px; margin-top: 5px;}
@@ -207,6 +212,10 @@
                 <div class="form-group">
                     <label><strong>Change Password:</strong></label>
                     <input type="password" id="setting-password" class="form-control mt-10" placeholder="Leave blank to keep current password">
+                </div>
+                <div class="form-group">
+                    <label><strong>Profile Bio:</strong></label>
+                    <textarea id="setting-bio" class="form-control mt-10" maxlength="220" placeholder="Write a short bio..."></textarea>
                 </div>
                 <button class="btn btn-success mt-10" onclick="saveSettings()">Save Changes</button>
                 <div class="form-group mt-20">
@@ -544,6 +553,7 @@
                         <span id="prof-online-dot" class="status-dot offline"></span> 
                         Profile: <span id="prof-username"></span>
                     </h2>
+                    <div style="font-size:12px; color:#666;">Joined <span id="prof-join-date"></span></div>
                     <div style="display: flex; gap: 10px;">
                         <button id="prof-message-btn" class="btn btn-warning btn-sm" style="display: none;" onclick="promptMessage()"></button>
                         <button id="prof-friend-btn" class="btn btn-success btn-sm" style="display: none;" onclick="toggleFriend()"></button>
@@ -556,8 +566,10 @@
                     <p style="font-size: 16px; color: #f39c12; font-weight: bold; margin: 0;">💰 <span id="prof-coins">0</span> SC</p>
                     <p style="margin: 0;"><strong>Followers:</strong> <span id="prof-followers-count">0</span></p>
                     <p style="margin: 0;"><strong>Games:</strong> <span id="prof-count">0</span></p>
+                    <p style="margin: 0;"><strong>Total Play Time:</strong> <span id="prof-play-time">0m</span></p>
                 </div>
 
+                <p id="prof-bio" style="margin-top:10px; color:#555;"></p>
                 <div id="prof-badges" style="margin-top: 15px;"></div>
                 
                 <div id="prof-avatar-section" style="display:none; align-items: center; gap: 10px; margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee;">
@@ -633,6 +645,8 @@
                 
                 <div style="flex-grow: 1;"></div>
                 <input type="text" id="editor-title" class="form-control" placeholder="Game Title..." style="width: 150px; margin: 0; margin-right: 5px;">
+                <input type="file" id="editor-thumbnail" class="form-control" accept="image/*" style="width:180px; margin-right:5px;">
+                <input type="text" id="editor-description" maxlength="1000" class="form-control" placeholder="Description (optional, 0-1000)" style="width:280px; margin-right:5px;">
                 <button class="btn btn-success" id="editor-save-btn" onclick="saveGame()">Publish Game</button>
             </div>
             
@@ -649,9 +663,11 @@
                 <div class="card play-game-card">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 10px;">
                         <div>
+                            <img id="play-thumb" class="game-thumb" style="height:120px; max-width:260px;" src="https://via.placeholder.com/320x180?text=Playsculpt">
                             <h2 class="card-title" id="play-title" style="margin: 0; border: none; padding: 0;">Game Title</h2>
                             <p style="margin: 5px 0 0 0; color: #7f8c8d; font-size: 14px;">By <span id="play-author" style="cursor: pointer; color: #3498db; text-decoration: underline;"></span></p>
                             <div id="play-tags-container" style="margin-top:5px;"></div>
+                            <p id="play-description" style="font-size:12px; color:#666; max-width:520px;"></p>
                         </div>
                         <div style="display: flex; gap: 10px; align-items: center;">
                             <span style="font-size: 14px; font-weight: bold; color: #3498db;">▶️ <span id="play-count">0</span> Plays</span>
@@ -725,6 +741,15 @@
         </div>
     </div>
 
+    <div id="iconic-loading-screen" class="iconic-loading">
+        <div class="box">
+            <img id="iconic-loading-thumb" class="game-thumb" style="height:170px;" src="" alt="Game thumbnail">
+            <h2 id="iconic-loading-title" style="margin:8px 0 4px 0;">Loading Game...</h2>
+            <p style="margin:0; opacity:0.85;">Playsculpt iconic loading screen</p>
+            <div class="spinner"></div>
+        </div>
+    </div>
+
     <!-- Modals -->
     <div id="message-modal" class="modal-overlay">
         <div class="modal-box">
@@ -753,6 +778,9 @@
         // --- State Management ---
         const API_BASE = '/api';
         let currentUser = null; 
+        let currentGameThumbnailData = '';
+        let currentGamePlayStartedAt = 0;
+        let currentTrackedGameId = null;
         const accImageCache = {}; 
         let isDragging = false; 
         let isDrawingAcc = false; 
@@ -864,8 +892,10 @@
             return `
                 <div class="game-card">
                     <span class="badge-pill badge-genre" style="float:right; margin-right:0;">${g.genre || 'Sandbox'}</span>
+                    <img class="game-thumb" src="${g.thumbnail || 'https://via.placeholder.com/320x180?text=Playsculpt'}" alt="${g.title}">
                     <h3 style="text-align:left; margin-bottom:5px;">${g.title}</h3>
                     <p style="font-size:11px; text-align:left; margin-bottom:5px;">By <a href="javascript:void(0)" onclick="if('${g.groupId}' && '${g.groupId}' !== 'undefined' && '${g.groupId}' !== 'null') { loadGroupDetail('${g.groupId}'); } else { loadProfile('${g.authorName}'); navigate('profile'); }" style="color:#3498db;">${g.authorName}</a></p>
+                    <p style="font-size:12px; text-align:left; color:#666; min-height:28px;">${(g.description || '').substring(0, 110)}</p>
                     <div style="text-align:left; margin-bottom:10px;">${tagsHtml}</div>
                     <div class="game-stats">
                         <span class="plays">▶️ ${g.plays || 0}</span>
@@ -1011,7 +1041,7 @@
         };
 
         const navigateProfile = () => {
-            if (currentUser) { 
+            if (currentUser) {
                 currentProfTab = 'created';
                 loadProfile(currentUser.username); 
                 navigate('profile'); 
@@ -1027,7 +1057,7 @@
             
             resetGlobalInteractionStates();
 
-            if (viewId !== 'play') stopGameLoop();
+            if (viewId !== 'play') { flushPlayTimer(); stopGameLoop(); }
             if (viewId !== 'create') stopTeamSync(); 
             if (viewId !== 'shop') stopAccEditorLoop();
             if (viewId !== 'group-detail') if(grpWallSyncInterval) clearInterval(grpWallSyncInterval);
@@ -1058,6 +1088,7 @@
                     document.getElementById('setting-username').value = currentUser.username;
                     document.getElementById('setting-status').value = currentUser.statusMessage || '';
                     document.getElementById('setting-theme-color').value = currentUser.profileThemeColor || '#ffffff';
+                    document.getElementById('setting-bio').value = currentUser.bio || '';
                     loadLoginHistory();
                 }
             } else if (viewId === 'create') {
@@ -1088,7 +1119,7 @@
             try {
                 const res = await apiCall('/me/daily-reward', 'POST');
                 if (res.rewarded) {
-                    showModal('Daily Reward!', `🔥 Streak: ${res.streak} Days!\nYou earned ${res.boosts} Boost(s) and ${res.coins} SculptCoins!${res.milestone ? '\n\n🎉 Milestone Bonus: +300 SC!' : ''}`);
+                    showModal('Daily Reward!', `🔥 Streak: ${res.streak} Days!\nYou earned ${res.earnedBoosts || 0} Boost(s) and ${res.earnedCoins || 0} SculptCoins!${res.milestone ? '\n\n🎉 Milestone Bonus: +300 SC!' : ''}`);
                 }
             } catch(e) {}
         };
@@ -1144,8 +1175,17 @@
             } catch (e) {}
         };
 
+
+        const flushPlayTimer = async () => {
+            if (!currentTrackedGameId || !currentGamePlayStartedAt || !currentUser) return;
+            const durationMs = Date.now() - currentGamePlayStartedAt;
+            currentGamePlayStartedAt = 0;
+            try { await apiCall(`/games/${currentTrackedGameId}/play-time`, 'POST', { durationMs }); } catch (e) {}
+        };
+
         const logout = async () => {
             if (currentUser) {
+                await flushPlayTimer();
                 try { await apiCall('/logout', 'POST'); } catch (e) {}
                 localStorage.removeItem('ps_token');
                 currentUser = null; updateNav(); navigate('landing');
@@ -1168,6 +1208,11 @@
             const newPassword = document.getElementById('setting-password').value;
             const statusMessage = document.getElementById('setting-status').value.trim();
             const themeColor = document.getElementById('setting-theme-color').value;
+            const bio = document.getElementById('setting-bio').value.trim();
+            try {
+                const res = await apiCall('/me/settings', 'PUT', { newUsername, newPassword });
+                await apiCall('/me/status', 'PUT', { statusMessage });
+                await apiCall('/me/bio', 'PUT', { bio });
             try {
                 const res = await apiCall('/me/settings', 'PUT', { newUsername, newPassword });
                 await apiCall('/me/status', 'PUT', { statusMessage });
@@ -1179,6 +1224,10 @@
 
                 showModal('Success', res.message);
                 if (currentUser) {
+                await flushPlayTimer();
+                    if (res.username) currentUser.username = res.username;
+                    currentUser.statusMessage = statusMessage;
+                    currentUser.bio = bio;
                     if (res.username) currentUser.username = res.username;
                     currentUser.statusMessage = statusMessage;
                     updateNav();
@@ -1295,44 +1344,44 @@
                     grid.appendChild(card);
                 });
             } catch(e) {}
-        };
+      };
 
-        const promptCreateGroup = () => {
-            showModal('Create a Group', 'Enter a name for your new group:', 'Create', async (name) => {
-                if(!name) return;
-                try {
-                    const res = await apiCall('/groups', 'POST', { name, description: 'A brand new group!' });
-                    loadGroupDetail(res.groupId);
-                } catch(e) {}
-            }, true, true);
-        };
+      const promptCreateGroup = () => {
+          showModal('Create a Group', 'Enter a name for your new group:', 'Create', async (name) => {
+              if(!name) return;
+              try {
+                  const res = await apiCall('/groups', 'POST', { name, description: 'A brand new group!' });
+                  loadGroupDetail(res.groupId);
+              } catch(e) {}
+          }, true, true);
+      };
 
-        const switchGroupTab = (tabId) => {
-            document.querySelectorAll('#view-group-detail .tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('#view-group-detail .tab-content').forEach(c => c.classList.remove('active'));
-            document.querySelector(`#view-group-detail .tab[onclick="switchGroupTab('${tabId}')"]`).classList.add('active');
-            document.getElementById(`tab-grp-${tabId}`).classList.add('active');
-            
-            if (tabId === 'forums') showForumCategories();
-        };
+      const switchGroupTab = (tabId) => {
+          document.querySelectorAll('#view-group-detail .tab').forEach(t => t.classList.remove('active'));
+          document.querySelectorAll('#view-group-detail .tab-content').forEach(c => c.classList.remove('active'));
+          document.querySelector(`#view-group-detail .tab[onclick="switchGroupTab('${tabId}')"]`).classList.add('active');
+          document.getElementById(`tab-grp-${tabId}`).classList.add('active');
 
-        const updateGroupWallUI = () => {
-            if(!currentGroupData) return;
-            const wall = document.getElementById('grp-wall-list');
-            wall.innerHTML = currentGroupData.posts.length === 0 ? '<p style="color:#777;">No posts yet.</p>' : '';
-            currentGroupData.posts.forEach(p => {
-                const canDel = currentGroupData.myPerms && currentGroupData.myPerms.deletePosts;
-                wall.innerHTML += `<div style="border-bottom:1px solid #eee; padding:10px 0; position:relative;">
-                    ${canDel ? `<button class="btn btn-danger btn-sm" style="position:absolute; right:0; top:10px; padding:2px 6px;" onclick="deleteGroupPost('${p.id}')">X</button>` : ''}
-                    <div style="font-size:11px; color:#999; margin-bottom:5px;"><b>${p.authorName}</b> - ${new Date(p.timestamp).toLocaleString()}</div>
-                    <div>${p.text}</div>
-                </div>`;
-            });
-        };
+          if (tabId === 'forums') showForumCategories();
+      };
 
-        const loadGroupDetail = async (groupId) => {
-            try {
-                if(grpWallSyncInterval) clearInterval(grpWallSyncInterval);
+      const updateGroupWallUI = () => {
+          if(!currentGroupData) return;
+          const wall = document.getElementById('grp-wall-list');
+          wall.innerHTML = currentGroupData.posts.length === 0 ? '<p style="color:#777;">No posts yet.</p>' : '';
+          currentGroupData.posts.forEach(p => {
+              const canDel = currentGroupData.myPerms && currentGroupData.myPerms.deletePosts;
+              wall.innerHTML += `<div style="border-bottom:1px solid #eee; padding:10px 0; position:relative;">
+                  ${canDel ? `<button class="btn btn-danger btn-sm" style="position:absolute; right:0; top:10px; padding:2px 6px;" onclick="deleteGroupPost('${p.id}')">X</button>` : ''}
+                  <div style="font-size:11px; color:#999; margin-bottom:5px;"><b>${p.authorName}</b> - ${new Date(p.timestamp).toLocaleString()}</div>
+                  <div>${p.text}</div>
+              </div>`;
+          });
+      };
+
+      const loadGroupDetail = async (groupId) => {
+          try {
+              if(grpWallSyncInterval) clearInterval(grpWallSyncInterval);
 
                 const group = await apiCall(`/groups/${groupId}`);
                 currentGroupData = group;
@@ -1697,6 +1746,10 @@
                 document.getElementById('prof-followers-count').innerText = profile.followersCount;
                 document.getElementById('prof-online-dot').className = `status-dot ${profile.isOnline ? 'online' : 'offline'}`;
                 document.getElementById('prof-status').innerText = profile.statusMessage || 'No status set.';
+                document.getElementById('prof-bio').innerText = profile.bio || 'No bio yet.';
+                document.getElementById('prof-join-date').innerText = profile.joinDate ? new Date(profile.joinDate).toLocaleDateString() : 'Unknown';
+                document.getElementById('prof-coins').innerText = localStorage.getItem('sc_' + profile.id) || '0';
+                document.getElementById('prof-play-time').innerText = Math.floor((profile.totalPlayTimeMs || 0) / 60000) + 'm';
                 document.getElementById('prof-coins').innerText = localStorage.getItem('sc_' + profile.id) || '0';
                 document.querySelector('#view-profile .card').style.background = profile.profileThemeColor || '#ffffff';
 
@@ -2242,6 +2295,8 @@
                 document.getElementById('editor-title').value = game.title;
                 document.getElementById('editor-genre').value = game.genre || 'Sandbox';
                 document.getElementById('editor-tags').value = (game.tags || []).join(', ');
+                document.getElementById('editor-description').value = game.description || '';
+                currentGameThumbnailData = game.thumbnail || '';
                 document.getElementById('editor-max-players').value = game.maxPlayers || 20;
                 document.getElementById('editor-ps-enabled').checked = !!game.psEnabled;
                 document.getElementById('editor-ps-price').value = game.psPrice || 0;
@@ -2535,17 +2590,34 @@
             const maxPlayers = document.getElementById('editor-max-players').value;
             const psEnabled = document.getElementById('editor-ps-enabled').checked;
             const psPrice = document.getElementById('editor-ps-price').value;
+            const description = document.getElementById('editor-description').value.substring(0, 1000);
 
             if (!title) return showModal('Hold up!', 'Please enter a title for your game.');
             if (!edData.spawn) return showModal('Incomplete Game', 'Please place a Spawn point for the player.');
             try {
                 if (currentEditGameId) {
                     recordEdit(); 
-                    await apiCall(`/games/${currentEditGameId}/sync`, 'POST', { gameData: edData, genre, tags, maxPlayers, psEnabled, psPrice, lastLocalEditTime: lastLocalEditTime });
+                    const file = document.getElementById('editor-thumbnail').files[0];
+                    let thumbnail = currentGameThumbnailData || '';
+                    if (file) {
+                        if (file.size > 1024 * 1024) return showModal('Too Large', 'Thumbnail must be 1MB or less.');
+                        thumbnail = await new Promise((resolve) => { const r = new FileReader(); r.onload = () => resolve(r.result); r.readAsDataURL(file); });
+                    }
+                    currentGameThumbnailData = thumbnail;
+                    await apiCall(`/games/${currentEditGameId}/sync`, 'POST', { gameData: edData, genre, tags, maxPlayers, psEnabled, psPrice, description, thumbnail, lastLocalEditTime: lastLocalEditTime });
                     showModal('Updated!', 'Game saved successfully.', 'To Dashboard', () => { currentEditGameId = null; document.getElementById('editor-title').value = ''; navigate('dashboard'); });
                 } else {
-                    await apiCall('/games', 'POST', { title, gameData: edData, genre, groupId, tags, maxPlayers, psEnabled, psPrice });
-                    showModal('Published!', 'Your game is now live. You earned the Creator badge!', 'Awesome', () => { document.getElementById('editor-title').value = ''; clearEditor(); navigate('library'); });
+                    const file = document.getElementById('editor-thumbnail').files[0];
+                    let thumbnail = currentGameThumbnailData || '';
+                    if (file) {
+                        if (file.size > 1024 * 1024) return showModal('Too Large', 'Thumbnail must be 1MB or less.');
+                        thumbnail = await new Promise((resolve) => {
+                            const r = new FileReader(); r.onload = () => resolve(r.result); r.readAsDataURL(file);
+                        });
+                    }
+                    currentGameThumbnailData = thumbnail;
+                    await apiCall('/games', 'POST', { title, gameData: edData, genre, groupId, tags, maxPlayers, psEnabled, psPrice, description, thumbnail });
+                    showModal('Published!', 'Your game is now live. You earned the Creator badge!', 'Awesome', () => { document.getElementById('editor-title').value = ''; document.getElementById('editor-description').value=''; document.getElementById('editor-thumbnail').value=''; currentGameThumbnailData=''; clearEditor(); navigate('library'); });
                 }
             } catch (e) {}
         };
@@ -2586,12 +2658,18 @@
 
         const loadGame = async (gameId, source = 'library') => {
             try {
+                await flushPlayTimer();
                 apiCall('/shop/items').then(items => { items.forEach(i => cacheAccessoryImage(i.id, i.image)); });
 
                 const game = await apiCall(`/games/${gameId}`);
+                document.getElementById('iconic-loading-title').innerText = game.title || 'Loading Game...';
+                document.getElementById('iconic-loading-thumb').src = game.thumbnail || 'https://via.placeholder.com/320x180?text=Playsculpt';
+                document.getElementById('iconic-loading-screen').style.display = 'flex';
                 currentPlayGameId = game.id;
                 document.getElementById('play-title').innerText = game.title;
+                document.getElementById('play-thumb').src = game.thumbnail || 'https://via.placeholder.com/320x180?text=Playsculpt';
                 document.getElementById('play-author').innerText = game.authorName;
+                document.getElementById('play-description').innerText = game.description || '';
                 const tagHtml = (game.tags || []).map(t => `<span class="badge-pill badge-dark" style="font-size:9px;">#${t}</span>`).join('');
                 document.getElementById('play-tags-container').innerHTML = tagHtml;
                 document.getElementById('play-likes').innerText = game.likesCount;
@@ -2654,7 +2732,10 @@
                 switchPlayTab('game');
                 
                 await apiCall(`/games/${gameId}/play`, 'POST', { source });
+                currentTrackedGameId = gameId;
+                currentGamePlayStartedAt = Date.now();
                 startGame(); // Auto-join public
+                setTimeout(() => { document.getElementById('iconic-loading-screen').style.display = 'none'; }, 700);
             } catch(e) {}
         };
 
