@@ -7,7 +7,10 @@ const app = express();
 const PORT = 3000;
 
 app.use(express.json({ limit: '10mb' })); 
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(__dirname));
+
+const MAX_ACTIVITY_ITEMS = 40;
+const PRIVATE_SERVER_LINK_TTL_MS = 3 * 60 * 60 * 1000;
 
 // In-memory databases
 const DB_FILE = path.join(__dirname, 'db.json');
@@ -16,7 +19,8 @@ let db = {
     sessions: {}, 
     games: [], 
     shopItems: [],
-    groups: [] 
+    groups: [],
+    activity: [] 
 };
 
 let activeEditors = {}; 
@@ -31,6 +35,7 @@ if (fs.existsSync(DB_FILE)) {
         
         if (!db.shopItems) db.shopItems = [];
         if (!db.groups) db.groups = [];
+        if (!db.activity) db.activity = [];
 
         db.users.forEach(u => { 
             if (!u.followers) u.followers = []; 
@@ -45,6 +50,9 @@ if (fs.existsSync(DB_FILE)) {
             if (typeof u.equipped === 'undefined') u.equipped = null;
             if (typeof u.primaryGroupId === 'undefined') u.primaryGroupId = null; 
             if (typeof u.coins === 'undefined') u.coins = 0; // Migrate coins to backend
+            if (typeof u.statusMessage === 'undefined') u.statusMessage = '';
+            if (typeof u.profileThemeColor === 'undefined') u.profileThemeColor = '#ffffff';
+            if (!u.loginHistory) u.loginHistory = [];
             
             if (u.friends.length > 0 && typeof u.friends[0] === 'string') {
                 u.friends = u.friends.map(id => ({ id, addedAt: Date.now() }));
@@ -58,6 +66,7 @@ if (fs.existsSync(DB_FILE)) {
             if (!g.updates) g.updates = []; 
             if (!g.genre) g.genre = 'Sandbox'; 
             if (typeof g.groupId === 'undefined') g.groupId = null;
+            if (!g.privateServers) g.privateServers = [];
         });
 
         // Migrate Groups to advanced roles system
@@ -138,10 +147,21 @@ const addGroupXp = (group, amount) => {
     group.level = Math.floor(group.xp / 200) + 1;
 };
 
+
+const pushActivity = (entry) => {
+    db.activity.unshift({ id: crypto.randomUUID(), timestamp: Date.now(), ...entry });
+    if (db.activity.length > MAX_ACTIVITY_ITEMS) db.activity = db.activity.slice(0, MAX_ACTIVITY_ITEMS);
+};
+
+const sanitizeDevice = (device) => {
+    if (!device || typeof device !== 'string') return 'Unknown Device';
+    return device.trim().substring(0, 80) || 'Unknown Device';
+};
+
 // --- Routes ---
 
 app.post('/api/signup', (req, res) => {
-    const { username, password } = req.body;
+    const { username, password, device } = req.body;
     if (!username || !password || username.length < 3 || password.length < 5) {
         return res.status(400).json({ error: 'Invalid username or password length.' });
     }
@@ -154,8 +174,10 @@ app.post('/api/signup', (req, res) => {
         id: crypto.randomUUID(), username, salt, hash,
         followers: [], friends: [], friendRequests: [],
         color: '#e74c3c', recentlyPlayed: [], badges: [], messages: [],
-        inventory: [], bookmarks: [], equipped: null, primaryGroupId: null, coins: 0
+        inventory: [], bookmarks: [], equipped: null, primaryGroupId: null, coins: 0,
+        statusMessage: '', profileThemeColor: '#ffffff', loginHistory: []
     };
+    newUser.loginHistory.unshift({ timestamp: Date.now(), device: sanitizeDevice(device) });
     db.users.push(newUser);
     
     const token = crypto.randomBytes(32).toString('hex');
@@ -166,12 +188,16 @@ app.post('/api/signup', (req, res) => {
 });
 
 app.post('/api/login', (req, res) => {
-    const { username, password } = req.body;
+    const { username, password, device } = req.body;
     const user = db.users.find(u => u.username.toLowerCase() === username.toLowerCase());
     
     if (!user || !verifyPassword(password, user.salt, user.hash)) {
         return res.status(401).json({ error: 'Invalid username or password.' });
     }
+
+    if (!user.loginHistory) user.loginHistory = [];
+    user.loginHistory.unshift({ timestamp: Date.now(), device: sanitizeDevice(device) });
+    if (user.loginHistory.length > 8) user.loginHistory = user.loginHistory.slice(0, 8);
 
     const token = crypto.randomBytes(32).toString('hex');
     db.sessions[token] = user.id;
@@ -301,6 +327,7 @@ app.get('/api/me', requireAuth, (req, res) => {
 
     res.json({
         id: user.id, username: user.username, color: user.color, badges: user.badges, coins: user.coins,
+        statusMessage: user.statusMessage || '', profileThemeColor: user.profileThemeColor || '#ffffff',
         requests, friends: friendsList, recentlyPlayed: recentGames, bookmarkedGames, 
         unreadMessages: (user.messages || []).length, equipped: user.equipped, myGroups
     });
@@ -311,6 +338,48 @@ app.put('/api/me/color', requireAuth, (req, res) => {
     user.color = req.body.color || '#e74c3c';
     saveDB();
     res.json({ success: true, color: user.color });
+});
+
+
+app.put('/api/me/status', requireAuth, (req, res) => {
+    const user = db.users.find(u => u.id === req.userId);
+    const statusMessage = (req.body.statusMessage || '').toString().trim().substring(0, 80);
+    user.statusMessage = statusMessage;
+    saveDB();
+    res.json({ success: true, statusMessage: user.statusMessage });
+});
+
+app.put('/api/me/theme-color', requireAuth, (req, res) => {
+    const user = db.users.find(u => u.id === req.userId);
+    const color = (req.body.color || '').toString();
+    if (!/^#[0-9a-fA-F]{6}$/.test(color)) return res.status(400).json({ error: 'Invalid color.' });
+    if (user.coins < 25) return res.status(400).json({ error: 'Need 25 SculptCoins to change profile theme.' });
+
+    user.coins -= 25;
+    user.profileThemeColor = color;
+    saveDB();
+    res.json({ success: true, profileThemeColor: user.profileThemeColor, coins: user.coins });
+});
+
+app.get('/api/me/login-history', requireAuth, (req, res) => {
+    const user = db.users.find(u => u.id === req.userId);
+    res.json((user.loginHistory || []).slice(0, 8));
+});
+
+app.get('/api/activity', requireAuth, (req, res) => {
+    const feed = (db.activity || []).slice(0, 15).map(item => {
+        if (item.type === 'friend_played') {
+            return { ...item, text: `${item.username} played ${item.gameTitle}` };
+        }
+        if (item.type === 'game_published') {
+            return { ...item, text: `${item.username} published ${item.gameTitle}` };
+        }
+        if (item.type === 'game_liked') {
+            return { ...item, text: `${item.username} liked ${item.gameTitle}` };
+        }
+        return { ...item, text: 'Activity update' };
+    });
+    res.json(feed);
 });
 
 app.post('/api/me/equip', requireAuth, (req, res) => {
@@ -365,6 +434,7 @@ app.get('/api/users/:username', (req, res) => {
 
     res.json({
         id: user.id, username: user.username, isOnline: isUserOnline(user.id), color: user.color, badges: user.badges,
+        statusMessage: user.statusMessage || '', profileThemeColor: user.profileThemeColor || '#ffffff',
         followersCount: user.followers.length, isFollowing, friendStatus, friends: friendsDetails,
         gamesCreated: userGames.length,
         games: userGames.map(g => ({ id: g.id, title: g.title, authorName: g.authorName, genre: g.genre, likes: g.likes.length, plays: g.plays, groupId: g.groupId })),
@@ -782,9 +852,10 @@ app.post('/api/games', requireAuth, (req, res) => {
     const newGame = {
         id: crypto.randomUUID(), title, authorId: user.id, authorName: authorName, genre: genre || 'Sandbox',
         groupId: groupId || null,
-        gameData, lastEditTime: Date.now(), collaborators: [], likes: [], plays: 0, updates: [], createdAt: new Date().toISOString()
+        gameData, lastEditTime: Date.now(), collaborators: [], likes: [], plays: 0, updates: [], privateServers: [], createdAt: new Date().toISOString()
     };
     db.games.push(newGame);
+    pushActivity({ type: 'game_published', userId: user.id, username: user.username, gameId: newGame.id, gameTitle: newGame.title });
     awardBadge(req.userId, 'Creator');
     saveDB();
     res.json({ message: 'Game saved successfully!', gameId: newGame.id });
@@ -860,7 +931,7 @@ app.get('/api/games/:id', (req, res) => {
         const user = db.users.find(u => u.id === userId);
         if (user && user.bookmarks.includes(game.id)) isBookmarked = true;
     }
-    res.json({ ...game, likesCount: game.likes.length, isLiked, isBookmarked, updates: game.updates || [] });
+    res.json({ ...game, likesCount: game.likes.length, isLiked, isBookmarked, updates: game.updates || [], activeServers: { public: [] } });
 });
 
 app.post('/api/games/:id/updates', requireAuth, (req, res) => {
@@ -905,6 +976,7 @@ app.post('/api/games/:id/play', requireAuth, (req, res) => {
     user.recentlyPlayed.unshift({ gameId, timestamp: Date.now() });
     if (user.recentlyPlayed.length > 8) user.recentlyPlayed.pop();
 
+    pushActivity({ type: 'friend_played', userId: user.id, username: user.username, gameId: game.id, gameTitle: game.title });
     awardBadge(req.userId, 'Gamer');
     saveDB();
     res.json({ success: true, coins: user.coins });
@@ -920,6 +992,7 @@ app.post('/api/games/:id/like', requireAuth, (req, res) => {
     } else {
         game.likes.push(req.userId);
         isLiked = true;
+        pushActivity({ type: 'game_liked', userId: req.userId, username: db.users.find(u => u.id === req.userId)?.username || 'Someone', gameId: game.id, gameTitle: game.title });
         awardBadge(req.userId, 'Critic');
     }
     saveDB();
@@ -1021,8 +1094,133 @@ app.post('/api/games/:id/play-sync', requireAuth, (req, res) => {
     res.json(others);
 });
 
+
+
+app.get('/api/games/:id/private-servers', requireAuth, (req, res) => {
+    const game = db.games.find(g => g.id === req.params.id);
+    if (!game) return res.status(404).json({ error: 'Game not found.' });
+    if (!game.privateServers) game.privateServers = [];
+
+    const myServers = game.privateServers
+        .filter(ps => ps.ownerId === req.userId || (ps.members || []).includes(req.userId))
+        .map(ps => ({
+            id: ps.id,
+            ownerId: ps.ownerId,
+            ownerName: db.users.find(u => u.id === ps.ownerId)?.username || 'Unknown',
+            joinEnabled: ps.joinEnabled !== false,
+            memberCount: (ps.members || []).length,
+            isOwner: ps.ownerId === req.userId,
+            canJoin: ps.ownerId === req.userId || ps.joinEnabled !== false || (ps.members || []).includes(req.userId)
+        }));
+
+    res.json(myServers);
+});
+
+app.post('/api/games/:id/private-servers', requireAuth, (req, res) => {
+    const game = db.games.find(g => g.id === req.params.id);
+    if (!game) return res.status(404).json({ error: 'Game not found.' });
+    if (!game.privateServers) game.privateServers = [];
+
+    const owned = game.privateServers.find(ps => ps.ownerId === req.userId);
+    if (owned) return res.json({ server: owned, message: 'Private server already exists.' });
+
+    const newServer = {
+        id: crypto.randomUUID(),
+        ownerId: req.userId,
+        members: [req.userId],
+        joinEnabled: true,
+        createdAt: Date.now(),
+        inviteLinks: []
+    };
+    game.privateServers.push(newServer);
+    saveDB();
+    res.json({ server: newServer, message: 'Private server created.' });
+});
+
+app.put('/api/private-servers/:serverId/join-enabled', requireAuth, (req, res) => {
+    let target = null;
+    let game = null;
+    for (const g of db.games) {
+        const found = (g.privateServers || []).find(ps => ps.id === req.params.serverId);
+        if (found) { target = found; game = g; break; }
+    }
+    if (!target || !game) return res.status(404).json({ error: 'Private server not found.' });
+    if (target.ownerId !== req.userId) return res.status(403).json({ error: 'Only owner can change this.' });
+
+    target.joinEnabled = !!req.body.joinEnabled;
+    saveDB();
+    res.json({ success: true, joinEnabled: target.joinEnabled });
+});
+
+app.post('/api/private-servers/:serverId/members', requireAuth, (req, res) => {
+    const username = (req.body.username || '').toString().trim();
+    const memberUser = db.users.find(u => u.username.toLowerCase() === username.toLowerCase());
+    if (!memberUser) return res.status(404).json({ error: 'User not found.' });
+
+    let target = null;
+    for (const g of db.games) {
+        const found = (g.privateServers || []).find(ps => ps.id === req.params.serverId);
+        if (found) { target = found; break; }
+    }
+    if (!target) return res.status(404).json({ error: 'Private server not found.' });
+    if (target.ownerId !== req.userId) return res.status(403).json({ error: 'Only owner can add members.' });
+
+    if (!target.members.includes(memberUser.id)) target.members.push(memberUser.id);
+    saveDB();
+    res.json({ success: true });
+});
+
+app.delete('/api/private-servers/:serverId/members/:memberId', requireAuth, (req, res) => {
+    let target = null;
+    for (const g of db.games) {
+        const found = (g.privateServers || []).find(ps => ps.id === req.params.serverId);
+        if (found) { target = found; break; }
+    }
+    if (!target) return res.status(404).json({ error: 'Private server not found.' });
+    if (target.ownerId !== req.userId) return res.status(403).json({ error: 'Only owner can remove members.' });
+    if (req.params.memberId === req.userId) return res.status(400).json({ error: 'Owner cannot be removed.' });
+
+    target.members = target.members.filter(id => id !== req.params.memberId);
+    saveDB();
+    res.json({ success: true });
+});
+
+app.post('/api/private-servers/:serverId/invite-link', requireAuth, (req, res) => {
+    let target = null;
+    let gameId = null;
+    for (const g of db.games) {
+        const found = (g.privateServers || []).find(ps => ps.id === req.params.serverId);
+        if (found) { target = found; gameId = g.id; break; }
+    }
+    if (!target) return res.status(404).json({ error: 'Private server not found.' });
+    if (target.ownerId !== req.userId) return res.status(403).json({ error: 'Only owner can create links.' });
+
+    if (!target.inviteLinks) target.inviteLinks = [];
+    const token = crypto.randomBytes(24).toString('hex');
+    const expiresAt = Date.now() + PRIVATE_SERVER_LINK_TTL_MS;
+    target.inviteLinks.unshift({ token, expiresAt, createdAt: Date.now() });
+    target.inviteLinks = target.inviteLinks.filter(link => link.expiresAt > Date.now()).slice(0, 8);
+    saveDB();
+    res.json({ token, gameId, expiresAt, shareUrl: `/join-private/${token}` });
+});
+
+app.post('/api/private-servers/join/:token', requireAuth, (req, res) => {
+    for (const g of db.games) {
+        for (const ps of (g.privateServers || [])) {
+            const link = (ps.inviteLinks || []).find(l => l.token === req.params.token);
+            if (!link) continue;
+            if (link.expiresAt <= Date.now()) return res.status(400).json({ error: 'Invite link expired.' });
+            if (ps.joinEnabled === false) return res.status(403).json({ error: 'Joining is currently disabled by owner.' });
+            if (!ps.members.includes(req.userId)) ps.members.push(req.userId);
+            saveDB();
+            return res.json({ success: true, serverId: ps.id, gameId: g.id });
+        }
+    }
+    res.status(404).json({ error: 'Invite link not found.' });
+});
+
 app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 app.listen(PORT, () => {
