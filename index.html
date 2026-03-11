@@ -1,0 +1,2101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <title>Playsculpt - Build & Play 3D Games</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        /* 2016 Nostalgic CSS / Flat Design Era */
+        @import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap');
+
+        body { font-family: 'Open Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #e9ebee; margin: 0; padding: 0; color: #333; overflow-x: hidden; touch-action: manipulation; }
+
+        /* Navbar */
+        .navbar { background-color: #2c3e50; padding: 0 20px; height: 60px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 4px rgba(0,0,0,0.1); overflow-x: auto; white-space: nowrap; }
+        .navbar-brand { color: #ecf0f1; font-size: 24px; font-weight: 700; text-decoration: none; cursor: pointer; letter-spacing: 1px; margin-right: 20px; }
+        .nav-links { display: flex; gap: 15px; align-items: center; }
+        .nav-links a { color: #bdc3c7; text-decoration: none; font-weight: 600; cursor: pointer; transition: color 0.2s ease; line-height: 60px; }
+        .nav-links a:hover, .nav-links a.active { color: #fff; }
+
+        .search-bar { padding: 6px 10px; border-radius: 3px; border: none; outline: none; font-size: 14px; width: 150px; }
+        .sculpt-coins { color: #f1c40f; font-weight: 700; margin-right: 10px; display: flex; align-items: center; cursor:help; }
+
+        /* Container & Cards */
+        .container { max-width: 1000px; margin: 30px auto; padding: 10px; }
+        .card { background: #fff; border-radius: 4px; border: 1px solid #d8dee2; padding: 25px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        .card-title { margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 15px; margin-bottom: 20px; color: #2c3e50; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;}
+
+        /* Forms & Buttons */
+        .form-group { margin-bottom: 15px; }
+        .form-control { width: 100%; padding: 10px 12px; border: 1px solid #ccc; border-radius: 3px; font-size: 14px; box-sizing: border-box; transition: border-color 0.2s; }
+        .form-control:focus { border-color: #3498db; outline: none; }
+
+        .btn { background-color: #3498db; color: white; border: none; padding: 10px 20px; border-radius: 3px; font-size: 14px; font-weight: 600; cursor: pointer; border-bottom: 3px solid #2980b9; transition: all 0.1s; display: inline-flex; align-items: center; justify-content: center; }
+        .btn:active { transform: translateY(2px); border-bottom: 1px solid #2980b9; margin-bottom: 2px; }
+        .btn-sm { padding: 6px 12px; font-size: 12px; }
+        .btn-success { background-color: #2ecc71; border-bottom-color: #27ae60; }
+        .btn-success:active { border-bottom-color: #27ae60; }
+        .btn-warning { background-color: #f1c40f; border-bottom-color: #f39c12; color: #333; }
+        .btn-warning:active { border-bottom-color: #f39c12; }
+        .btn-danger { background-color: #e74c3c; border-bottom-color: #c0392b; }
+        .btn-danger:active { border-bottom-color: #c0392b; }
+        .btn-info { background-color: #9b59b6; border-bottom-color: #8e44ad; }
+        .btn-info:active { border-bottom-color: #8e44ad; }
+        .btn-dark { background-color: #34495e; border-bottom-color: #2c3e50; }
+        .btn-dark:active { border-bottom-color: #2c3e50; }
+
+        .mb-10 { margin-bottom: 10px; }
+
+        /* Grids & Lists */
+        .game-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; }
+        .user-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+        .list-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee; }
+        .list-item:last-child { border-bottom: none; }
+
+        .game-card { background: #fff; border: 1px solid #d8dee2; border-radius: 4px; padding: 15px; text-align: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05); position:relative; }
+        .game-card h3 { margin: 0 0 10px 0; font-size: 18px; color: #333; }
+        .game-card p { margin: 0 0 5px 0; font-size: 13px; color: #777; }
+        .game-actions { display: flex; justify-content: center; gap: 5px; margin-top: 10px; flex-wrap: wrap; }
+        .game-stats { font-size:12px; color:#e84393; font-weight: 600; display:flex; justify-content:center; gap: 10px; margin-top: 5px;}
+        .game-stats span.plays { color: #3498db; }
+
+        .shop-img { width: 60px; height: 60px; object-fit: contain; margin: 0 auto 10px auto; display: block; border: 1px dashed #ccc; background: #fdfdfd; }
+
+        .user-card { background: #fdfdfd; border: 1px solid #e1e4e8; border-radius: 4px; padding: 10px; text-align: center; cursor: pointer; transition: background 0.2s; }
+        .user-card:hover { background: #f1f8ff; }
+        .user-card h4 { margin: 0 0 5px 0; font-size: 14px; color: #2c3e50; }
+
+        .status-dot { height: 10px; width: 10px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+        .online { background-color: #2ecc71; }
+        .offline { background-color: #95a5a6; }
+
+        .badge-pill { background: #9b59b6; color: #fff; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; margin-right: 5px; display: inline-block; margin-bottom: 5px;}
+        .badge-gamer { background: #2ecc71; }
+        .badge-creator { background: #f39c12; }
+        .badge-critic { background: #e84393; }
+        .badge-genre { background: #34495e; }
+
+        /* 3D Canvas Container */
+        .canvas-container { background: #34495e; padding: 10px; border-radius: 4px; display: inline-block; position: relative; width: 100%; box-sizing: border-box; }
+        #editor-container-3d, #play-container-3d { width: 100%; aspect-ratio: 16/9; max-height: 500px; background: #87CEEB; border-radius: 2px; position: relative; outline: none; }
+        
+        .acc-editor-container { display: flex; gap: 20px; align-items: flex-start; justify-content: center; flex-wrap: wrap; }
+        #acc-editor-3d { width: 100%; max-width: 400px; aspect-ratio: 1/1; background: #87CEEB; border-radius: 4px; border: 1px solid #ccc; cursor: crosshair; outline: none; }
+
+        /* Toolbar */
+        .toolbar { background: #fff; padding: 10px; border: 1px solid #d8dee2; border-radius: 4px; margin-bottom: 15px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .tool-btn { background: #ecf0f1; color: #333; border: 1px solid #bdc3c7; padding: 8px 15px; border-radius: 3px; cursor: pointer; font-weight: 600; }
+        .tool-btn.active { background: #3498db; color: white; border-color: #2980b9; }
+        .active-users-badge { background-color: #2ecc71; color: white; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: bold; }
+
+        /* View Management */
+        .view { display: none; }
+        .view.active { display: block; }
+        
+        /* Tabs */
+        .tabs { display: flex; border-bottom: 1px solid #d8dee2; margin-bottom: 20px; overflow-x: auto; }
+        .tab { padding: 10px 20px; cursor: pointer; font-weight: 600; color: #7f8c8d; white-space: nowrap; }
+        .tab.active { color: #2c3e50; border-bottom: 3px solid #3498db; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Custom Modal */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
+        .modal-box { background: #fff; padding: 25px; border-radius: 4px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); text-align: center; min-width: 300px; max-width: 90vw; max-height: 90vh; overflow-y: auto;}
+        .modal-box h3 { margin-top: 0; }
+        .flex-center { display: flex; justify-content: center; gap: 10px; margin-top: 20px;}
+
+        .text-center { text-align: center; }
+        .mt-10 { margin-top: 10px; }
+        .mt-20 { margin-top: 20px; }
+        
+        /* 3D UI Overlay & Mobile Controls */
+        .overlay-instruction { position: absolute; bottom: 15px; left: 15px; color: white; text-shadow: 1px 1px 2px #000; pointer-events: none; font-size: 12px; font-weight: bold; z-index: 10; }
+        #nametags-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: hidden; z-index: 5; }
+        .nametag { position: absolute; background: rgba(0,0,0,0.5); color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; transform: translate(-50%, -100%); white-space: nowrap; }
+
+        /* Mobile D-Pad */
+        .mobile-btn { background: rgba(255,255,255,0.4); border: 2px solid rgba(0,0,0,0.2); border-radius: 50%; color: #333; font-weight: bold; font-size: 14px; display: flex; align-items: center; justify-content: center; user-select: none; -webkit-user-select: none; touch-action: none; }
+        .mobile-btn:active { background: rgba(255,255,255,0.7); }
+        
+        .play-layout { display: flex; gap: 20px; align-items: flex-start; justify-content: center; text-align: left; flex-wrap: wrap; }
+        .play-game-card { padding: 15px; width: 100%; max-width: 850px; box-sizing: border-box; margin-bottom: 0; }
+        .play-sidebar { width: 100%; max-width: 250px; padding: 15px; margin-bottom: 0; height: 480px; overflow-y: auto; }
+
+        /* Forums UI */
+        .forum-cat { padding: 15px; border: 1px solid #eee; border-radius: 4px; margin-bottom: 10px; cursor: pointer; transition: background 0.2s; display: flex; justify-content: space-between; align-items: center; }
+        .forum-cat:hover { background: #f9f9f9; }
+        .forum-thread { padding: 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+        .forum-thread:hover { background: #f9f9f9; }
+        .forum-reply { padding: 10px; border: 1px solid #eee; border-radius: 4px; margin-bottom: 10px; background: #fafafa; }
+
+        .analytics-stat-box { border: 1px solid #eee; padding: 15px; text-align: center; border-radius: 4px; background: #fafafa; }
+        .analytics-stat-box h3 { margin-top: 0; margin-bottom: 5px; font-size: 14px; color: #777; }
+        .analytics-stat-box p { margin: 0; font-size: 24px; font-weight: bold; color: #3498db; }
+
+        @media(max-width: 768px) {
+            .play-sidebar { height: auto; max-height: 300px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Navbar -->
+    <div class="navbar">
+        <div class="navbar-brand" onclick="navigate('dashboard')">Playsculpt 3D</div>
+        <div class="nav-links" id="nav-logged-out">
+            <a onclick="navigate('landing')">Login / Sign Up</a>
+        </div>
+        <div class="nav-links" id="nav-logged-in" style="display:none;">
+            <input type="text" class="search-bar" id="nav-search" placeholder="Search Users..." onkeydown="if(event.key==='Enter') executeUserSearch()">
+            <div class="sculpt-coins" title="SculptCoins">💰 <span id="nav-coins">0</span> SC</div>
+            <div class="sculpt-coins" title="Launchpad Boosts" style="color:#e84393;">🚀 <span id="nav-boosts">0</span></div>
+            <a onclick="navigate('dashboard')">Dashboard</a>
+            <a onclick="navigate('library')">Library</a>
+            <a onclick="navigate('groups')">Groups</a>
+            <a onclick="navigate('create')">Create</a>
+            <a onclick="navigate('shop')">Shop</a>
+            <a onclick="navigate('friends')">Friends</a>
+            <a onclick="navigate('messages')">Messages</a>
+            <a onclick="navigateProfile()">Profile</a>
+            <a onclick="navigate('settings')">Settings</a>
+            <a onclick="logout()">Logout</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Landing View -->
+        <div id="view-landing" class="view active">
+            <div style="display: flex; gap: 30px; justify-content: center; flex-wrap: wrap;">
+                <div class="card" style="width: 100%; max-width: 400px;">
+                    <h2 class="card-title">Login</h2>
+                    <div class="form-group"><input type="text" id="login-user" class="form-control" placeholder="Username"></div>
+                    <div class="form-group"><input type="password" id="login-pass" class="form-control" placeholder="Password"></div>
+                    <button class="btn" onclick="login()">Log In</button>
+                </div>
+                <div class="card" style="width: 100%; max-width: 400px;">
+                    <h2 class="card-title">Sign Up</h2>
+                    <div class="form-group"><input type="text" id="signup-user" class="form-control" placeholder="Choose a Username"></div>
+                    <div class="form-group"><input type="password" id="signup-pass" class="form-control" placeholder="Create a Password"></div>
+                    <button class="btn btn-success" onclick="signup()">Create Account</button>
+                </div>
+            </div>
+            <div class="card mt-20" style="width: 100%; max-width: 830px; margin: 20px auto;">
+                <h2 class="card-title">🚀 Playsculpt Launchpad (Boosted Games)</h2>
+                <div id="landing-launchpad-grid" class="game-grid"></div>
+            </div>
+        </div>
+
+        <!-- Settings View -->
+        <div id="view-settings" class="view">
+            <div class="card" style="max-width: 500px; margin: 0 auto;">
+                <h2 class="card-title">User Settings</h2>
+                <div class="form-group">
+                    <label><strong>Change Username:</strong></label>
+                    <input type="text" id="setting-username" class="form-control mt-10" placeholder="New username">
+                </div>
+                <div class="form-group">
+                    <label><strong>Change Password:</strong></label>
+                    <input type="password" id="setting-password" class="form-control mt-10" placeholder="Leave blank to keep current password">
+                </div>
+                <button class="btn btn-success mt-10" onclick="saveSettings()">Save Changes</button>
+                
+                <hr style="margin:25px 0;">
+                <h3 style="margin-top:0;">Login History</h3>
+                <p style="font-size:12px; color:#777; margin-top:0;">Recent sign ins for security awareness.</p>
+                <div id="settings-login-history" style="font-size:12px; color:#555; background:#fafafa; padding:10px; border:1px solid #eee; border-radius:4px; max-height:150px; overflow-y:auto;">
+                    Loading...
+                </div>
+            </div>
+        </div>
+
+        <!-- Analytics View -->
+        <div id="view-analytics" class="view">
+            <div class="card">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <h2 class="card-title" style="border:none; margin:0;">📊 Analytics: <span id="analytics-game-title"></span></h2>
+                    <select id="analytics-timeframe" class="form-control" style="width: 150px;" onchange="loadAnalytics()">
+                        <option value="1">Last 24 Hours</option>
+                        <option value="7" selected>Last 7 Days</option>
+                        <option value="30">Last 30 Days</option>
+                        <option value="365">Last Year</option>
+                    </select>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
+                    <div class="analytics-stat-box">
+                        <h3>Total Plays</h3>
+                        <p id="analytics-plays">0</p>
+                    </div>
+                    <div class="analytics-stat-box">
+                        <h3>SculptCoin Revenue</h3>
+                        <p id="analytics-revenue">0 SC</p>
+                    </div>
+                    <div class="analytics-stat-box">
+                        <h3>New Likes</h3>
+                        <p id="analytics-likes">0</p>
+                    </div>
+                    <div class="analytics-stat-box">
+                        <h3>Peak Concurrent Players</h3>
+                        <p id="analytics-concurrent">0</p>
+                    </div>
+                    <div class="analytics-stat-box">
+                        <h3>Avg Session Length</h3>
+                        <p id="analytics-session">0m</p>
+                    </div>
+                    <div class="analytics-stat-box">
+                        <h3>Player Retention</h3>
+                        <p id="analytics-retention">0%</p>
+                    </div>
+                    <div class="analytics-stat-box">
+                        <h3>Peak Activity Time</h3>
+                        <p id="analytics-peak">N/A</p>
+                    </div>
+                    <div class="analytics-stat-box">
+                        <h3>Top Traffic Source</h3>
+                        <p id="analytics-source">None</p>
+                    </div>
+                </div>
+                <button class="btn mt-20" onclick="navigate('dashboard')">Back to Dashboard</button>
+            </div>
+        </div>
+
+        <!-- Groups View -->
+        <div id="view-groups" class="view">
+            <div class="card">
+                <div class="card-title">
+                    <h2 style="margin: 0;">Groups</h2>
+                    <button class="btn btn-success btn-sm" onclick="promptCreateGroup()">Create Group</button>
+                </div>
+                <div id="groups-list-grid" class="game-grid"></div>
+            </div>
+        </div>
+
+        <!-- Single Group Detail View -->
+        <div id="view-group-detail" class="view">
+            <div class="card">
+                <div class="card-title">
+                    <h2 style="margin: 0;" id="gd-name">Group Name</h2>
+                    <div style="display:flex; gap:10px;">
+                        <button class="btn btn-sm btn-info" id="btn-group-join" style="display:none;" onclick="joinGroup()">Join Group</button>
+                        <button class="btn btn-sm btn-danger" id="btn-group-leave" style="display:none;" onclick="leaveGroup()">Leave Group</button>
+                    </div>
+                </div>
+                <p id="gd-desc" style="color:#777; margin-top:0;"></p>
+                <div style="font-size: 12px; color: #777; margin-bottom: 5px;">Level <span id="gd-level">1</span> (<span id="gd-xp">0</span> XP)</div>
+                <div style="display: flex; gap: 20px; align-items: center; margin-bottom: 20px;">
+                    <p style="font-size: 16px; color: #f39c12; font-weight: bold; margin: 0;">💰 Group Funds: <span id="gd-coins">0</span> SC</p>
+                    <span id="gd-my-role" class="badge-pill badge-genre" style="display:none;"></span>
+                </div>
+
+                <div class="tabs" style="margin-bottom: 20px;">
+                    <div class="tab active" onclick="switchGroupTab('wall')">Group Wall</div>
+                    <div class="tab" onclick="switchGroupTab('forums')">Forums</div>
+                    <div class="tab" onclick="switchGroupTab('events')">Events</div>
+                    <div class="tab" onclick="switchGroupTab('games')">Group Games</div>
+                    <div class="tab" onclick="switchGroupTab('members')">Members</div>
+                    <div class="tab" id="tab-btn-grp-admin" style="display:none;" onclick="switchGroupTab('admin')">Admin</div>
+                </div>
+
+                <!-- Wall -->
+                <div id="tab-grp-wall" class="tab-content active">
+                    <div id="grp-post-form" style="display:none; margin-bottom: 15px; display:flex; gap:10px;">
+                        <input type="text" id="grp-post-text" class="form-control" placeholder="Say something to the group...">
+                        <button class="btn btn-success" onclick="postToGroupWall()">Post</button>
+                    </div>
+                    <div id="grp-wall-list"></div>
+                </div>
+
+                <!-- Forums -->
+                <div id="tab-grp-forums" class="tab-content">
+                    <div id="gf-categories-view">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                            <h3 style="margin:0;">Forum Categories</h3>
+                            <button class="btn btn-sm btn-success" id="gf-btn-create-cat" style="display:none;" onclick="promptCreateCategory()">+ New Category</button>
+                        </div>
+                        <div id="gf-categories-list"></div>
+                    </div>
+                    
+                    <div id="gf-threads-view" style="display:none;">
+                        <button class="btn btn-sm btn-info mb-10" onclick="showForumCategories()">← Back to Categories</button>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; margin-top:10px;">
+                            <h3 style="margin:0;" id="gf-cat-title">Category Threads</h3>
+                            <button class="btn btn-sm btn-success" id="gf-btn-create-thread" style="display:none;" onclick="promptCreateThread()">+ New Thread</button>
+                        </div>
+                        <div id="gf-threads-list"></div>
+                    </div>
+
+                    <div id="gf-thread-detail-view" style="display:none;">
+                        <button class="btn btn-sm btn-info mb-10" onclick="showForumThreads(currentCategoryId)">← Back to Threads</button>
+                        <h3 id="gf-td-title" style="margin-top:10px;">Thread Title</h3>
+                        <div id="gf-td-content" class="forum-reply" style="background:#fff; border-color:#3498db;"></div>
+                        <h4 class="mt-20">Replies</h4>
+                        <div id="gf-td-replies"></div>
+                        <div id="gf-reply-form" style="display:none; margin-top: 15px;">
+                            <textarea id="gf-reply-text" class="form-control" placeholder="Write a reply..." rows="3" style="resize:none; margin-bottom:10px;"></textarea>
+                            <button class="btn btn-success btn-sm" onclick="postThreadReply()">Post Reply</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Events -->
+                <div id="tab-grp-events" class="tab-content">
+                    <div id="grp-events-form" style="display:none; margin-bottom: 15px; border-bottom: 1px dashed #ccc; padding-bottom: 15px;">
+                        <h4>Create Event</h4>
+                        <input type="text" id="grp-event-name" class="form-control mb-10" placeholder="Event Name (e.g. Update 1.5 Release)">
+                        <input type="text" id="grp-event-desc" class="form-control mb-10" placeholder="Description">
+                        <input type="datetime-local" id="grp-event-date" class="form-control mb-10">
+                        <button class="btn btn-success btn-sm" onclick="createGroupEvent()">Schedule Event</button>
+                    </div>
+                    <div id="grp-events-list"></div>
+                </div>
+
+                <!-- Games -->
+                <div id="tab-grp-games" class="tab-content">
+                    <div id="grp-games-grid" class="game-grid"></div>
+                </div>
+
+                <!-- Members -->
+                <div id="tab-grp-members" class="tab-content">
+                    <div id="grp-members-list" class="user-grid"></div>
+                </div>
+
+                <!-- Admin Settings -->
+                <div id="tab-grp-admin" class="tab-content">
+                    <div style="display:flex; gap:20px; flex-wrap:wrap;">
+                        <!-- Role Management -->
+                        <div class="card" style="flex:1; min-width: 300px; padding:15px; box-shadow:none; border:1px solid #ccc;">
+                            <h3 style="margin-top:0;">Manage Roles</h3>
+                            <div id="grp-roles-list" style="margin-bottom:10px; font-size:13px; line-height:1.6;"></div>
+                            <button class="btn btn-sm btn-info" onclick="promptCreateRole()">+ Create Role</button>
+                        </div>
+                        <!-- Member Management -->
+                        <div class="card" style="flex:1; min-width: 300px; padding:15px; box-shadow:none; border:1px solid #ccc;">
+                            <h3 style="margin-top:0;">Manage Members</h3>
+                            <input type="text" id="grp-admin-mem-search" class="form-control mb-10" placeholder="Username to edit/kick...">
+                            <select id="grp-admin-role-select" class="form-control mb-10"></select>
+                            <div style="display:flex; gap:10px;">
+                                <button class="btn btn-sm btn-success" onclick="adminSetRole()">Set Role</button>
+                                <button class="btn btn-sm btn-danger" onclick="adminKickUser()">Kick Member</button>
+                            </div>
+                        </div>
+                        <!-- Payouts -->
+                        <div class="card" style="flex:1; min-width: 300px; padding:15px; box-shadow:none; border:1px solid #ccc;" id="grp-admin-payouts" style="display:none;">
+                            <h3 style="margin-top:0;">Group Payouts</h3>
+                            <p style="font-size: 12px; color: #777;">Distribute Group Funds to Members</p>
+                            <select id="grp-payout-user" class="form-control mb-10"></select>
+                            <input type="number" id="grp-payout-amount" class="form-control mb-10" placeholder="Amount (SC)...">
+                            <button class="btn btn-sm btn-success" onclick="adminPayout()">Send Funds</button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Shop View -->
+        <div id="view-shop" class="view">
+            <div class="card">
+                <div class="tabs" style="margin-bottom:0;">
+                    <div class="tab active" onclick="switchShopTab('market')">Marketplace</div>
+                    <div class="tab" onclick="switchShopTab('make')">Create Accessory</div>
+                </div>
+                
+                <div id="tab-shop-market" class="tab-content active" style="padding-top: 20px;">
+                    <div id="shop-grid" class="game-grid"></div>
+                </div>
+
+                <div id="tab-shop-make" class="tab-content" style="padding-top: 20px;">
+                    <div class="acc-editor-container">
+                        <div style="flex-grow: 1; max-width: 400px;">
+                            <h4>Design 3D Accessory</h4>
+                            <div class="toolbar" style="margin-bottom: 5px;">
+                                <input type="color" id="acc-color" value="#ffffff" style="cursor:pointer; width:30px; height:30px; padding:0; border:none;">
+                                <button class="tool-btn active" id="acc-tool-camera" onclick="setAccTool('camera')">🎥 Camera</button>
+                                <button class="tool-btn" id="acc-tool-draw" onclick="setAccTool('draw')">🖌️ Draw</button>
+                                <button class="tool-btn" id="acc-tool-erase" onclick="setAccTool('erase')">❌ Erase</button>
+                                <button class="tool-btn btn-danger" onclick="clearAcc()">Clear</button>
+                            </div>
+                            <div id="acc-editor-3d"></div>
+                            <p style="font-size:11px; color:#777; margin-top:5px;">Use Camera mode to rotate/zoom. Use Draw mode to place blocks on the grid.</p>
+                        </div>
+
+                        <div style="width: 100%; max-width: 250px;">
+                            <h4 class="mt-20">Item Details</h4>
+                            <div class="form-group"><input type="text" id="acc-name" class="form-control" placeholder="Item Name"></div>
+                            <div class="form-group"><input type="text" id="acc-desc" class="form-control" placeholder="Short Description"></div>
+                            <div class="form-group"><input type="number" id="acc-price" class="form-control" placeholder="Price (0 for free)"></div>
+                            <button class="btn btn-success" style="width:100%;" onclick="uploadAccessory()">Upload (Costs 15 SC)</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Messages View -->
+        <div id="view-messages" class="view">
+            <div class="card">
+                <h2 class="card-title">My Inbox</h2>
+                <div id="messages-list"></div>
+            </div>
+        </div>
+
+        <!-- Dashboard View -->
+        <div id="view-dashboard" class="view">
+            <div class="card">
+                <h2 class="card-title">Welcome to Playsculpt, <span id="dash-username"></span>!</h2>
+                <h3 style="color: #f39c12; margin-top: 0;">Balance: <span id="dash-coins">0</span> SculptCoins</h3>
+                <div style="display: flex; gap: 15px; margin-top: 20px;">
+                    <button class="btn btn-success" onclick="navigate('create')">Launch 3D Game Editor</button>
+                    <button class="btn" onclick="navigate('library')">Play Community Games</button>
+                </div>
+            </div>
+            
+            <div class="card mt-20">
+                <h2 class="card-title">🌐 Recent Activity</h2>
+                <div id="dash-activity-feed" style="max-height: 200px; overflow-y: auto; background: #fafafa; border: 1px solid #eee; padding: 10px; border-radius: 4px;"></div>
+            </div>
+            
+            <div class="card mt-20">
+                <h2 class="card-title">⭐ Saved Games</h2>
+                <div id="saved-games-grid" class="game-grid"></div>
+            </div>
+
+            <div class="card mt-20">
+                <h2 class="card-title">🌟 New & Updated Games</h2>
+                <div id="fresh-games-grid" class="game-grid"></div>
+            </div>
+            <div class="card mt-20">
+                <h2 class="card-title">🔥 Trending Games</h2>
+                <div id="trending-games-grid" class="game-grid"></div>
+            </div>
+            <div class="card mt-20">
+                <h2 class="card-title">❤️ Most Liked Games</h2>
+                <div id="most-liked-games-grid" class="game-grid"></div>
+            </div>
+            <div class="card mt-20">
+                <h2 class="card-title">Recently Played Games</h2>
+                <div id="recent-games-grid" class="game-grid"></div>
+            </div>
+            <div class="card mt-20">
+                <h2 class="card-title">Games You Can Edit</h2>
+                <div id="editable-games-grid" class="game-grid"></div>
+            </div>
+        </div>
+
+        <!-- Search View -->
+        <div id="view-search" class="view">
+            <div class="card">
+                <h2 class="card-title">User Search Results</h2>
+                <div id="search-results-grid" class="user-grid"></div>
+            </div>
+        </div>
+        
+        <!-- Friends View -->
+        <div id="view-friends" class="view">
+            <div class="card">
+                <h2 class="card-title">Friend Requests</h2>
+                <div id="friend-requests-list"></div>
+            </div>
+            <div class="card">
+                <h2 class="card-title">My Friends</h2>
+                <div id="my-friends-list"></div>
+            </div>
+        </div>
+
+        <!-- Library View -->
+        <div id="view-library" class="view">
+            <div class="card">
+                <div class="card-title">
+                    <h2 style="margin: 0;">Community Games Library</h2>
+                    <div style="display: flex; gap: 10px;">
+                        <select id="genre-filter" class="form-control" style="width: 150px;" onchange="loadLibrary()">
+                            <option value="All">All Genres</option>
+                            <option value="Sandbox">Sandbox</option>
+                            <option value="Adventure">Adventure</option>
+                            <option value="Obby">Obby</option>
+                            <option value="Horror">Horror</option>
+                            <option value="Action">Action</option>
+                        </select>
+                        <input type="text" id="game-search" class="form-control" style="width: 200px;" placeholder="Search Games..." onkeydown="if(event.key==='Enter') loadLibrary()">
+                    </div>
+                </div>
+                <div id="games-grid" class="game-grid"></div>
+            </div>
+        </div>
+
+        <!-- Profile View -->
+        <div id="view-profile" class="view">
+            <div class="card" style="padding-top: 0; overflow: hidden;">
+                <!-- Theme Banner -->
+                <div id="prof-theme-banner" style="height: 100px; margin: 0 -25px 20px -25px; background-color: #ffffff; border-bottom: 1px solid #eee;"></div>
+                
+                <!-- Primary Group Banner -->
+                <div id="prof-primary-group-banner" style="display:none; background: #34495e; color:white; padding:10px 20px; border-radius:4px; margin-bottom:15px; cursor:pointer;" onclick="if(currentProfileData && currentProfileData.primaryGroup) { loadGroupDetail(currentProfileData.primaryGroup.id); }">
+                    <span style="font-size:12px; opacity:0.8; display:block;">Primary Group</span>
+                    <strong style="font-size:18px;" id="prof-pg-name"></strong> - <span id="prof-pg-role"></span>
+                </div>
+
+                <div class="card-title">
+                    <h2 style="margin: 0;">
+                        <span id="prof-online-dot" class="status-dot offline"></span> 
+                        <span id="prof-username"></span>
+                    </h2>
+                    <div style="display: flex; gap: 10px;">
+                        <button id="prof-message-btn" class="btn btn-warning btn-sm" style="display: none;" onclick="promptMessage()"></button>
+                        <button id="prof-friend-btn" class="btn btn-success btn-sm" style="display: none;" onclick="toggleFriend()"></button>
+                        <button id="prof-follow-btn" class="btn btn-info btn-sm" style="display: none;" onclick="toggleFollow()"></button>
+                    </div>
+                </div>
+                
+                <!-- Player Status -->
+                <div style="font-size: 14px; color: #555; font-style: italic; margin-top: -10px; margin-bottom: 15px;">
+                    "<span id="prof-status-text">No status set.</span>"
+                    <button id="prof-edit-status-btn" class="btn btn-sm btn-dark" style="display:none; padding:2px 6px; font-size:10px; margin-left:10px;" onclick="promptEditStatus()">Edit</button>
+                </div>
+
+                <div style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
+                    <p style="font-size: 16px; color: #f39c12; font-weight: bold; margin: 0;">💰 <span id="prof-coins">0</span> SC</p>
+                    <p style="margin: 0;"><strong>Followers:</strong> <span id="prof-followers-count">0</span></p>
+                    <p style="margin: 0;"><strong>Games:</strong> <span id="prof-count">0</span></p>
+                </div>
+
+                <div id="prof-badges" style="margin-top: 15px;"></div>
+                
+                <div id="prof-theme-section" style="display:none; align-items: center; gap: 10px; margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee;">
+                    <label><strong>Profile Theme:</strong></label>
+                    <input type="color" id="prof-theme-picker" style="cursor:pointer; width: 30px; height: 30px; border:none; padding:0;">
+                    <button class="btn btn-sm btn-warning" onclick="updateProfileTheme()">Set Theme (25 SC)</button>
+                </div>
+                
+                <div id="prof-avatar-section" style="display:none; align-items: center; gap: 10px; margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee;">
+                    <label><strong>Avatar Color:</strong></label>
+                    <input type="color" id="prof-color-picker" style="cursor:pointer; width: 30px; height: 30px; border:none; padding:0;" onchange="updateAvatarColor(this.value)">
+                    <span style="font-size: 12px; color: #7f8c8d;">(This is how you appear in games)</span>
+                </div>
+                
+                <div class="tabs mt-20">
+                    <div class="tab active" onclick="switchProfileTab('created')">Created</div>
+                    <div class="tab" onclick="switchProfileTab('liked')">Liked Games</div>
+                    <div class="tab" onclick="switchProfileTab('groups')">Groups</div>
+                    <div class="tab" onclick="switchProfileTab('friends')">Friends</div>
+                    <div class="tab" onclick="switchProfileTab('inventory')">Inventory</div>
+                </div>
+
+                <div id="tab-created" class="tab-content active">
+                    <div id="prof-games" class="game-grid"></div>
+                </div>
+                <div id="tab-liked" class="tab-content">
+                    <div id="prof-liked-games" class="game-grid"></div>
+                </div>
+                <div id="tab-groups" class="tab-content">
+                    <div id="prof-groups-list" class="user-grid"></div>
+                </div>
+                <div id="tab-friends" class="tab-content">
+                    <div id="prof-friends-list" class="user-grid"></div>
+                </div>
+                <div id="tab-inventory" class="tab-content">
+                    <div id="prof-inventory-grid" class="game-grid"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Create/Editor View -->
+        <div id="view-create" class="view text-center">
+            <div class="toolbar" style="background: #fdfdfd;">
+                <span style="font-weight: 600; color:#2c3e50;">Team Create:</span>
+                <span id="active-editors-list" class="active-users-badge">Only You</span>
+                <button class="btn btn-warning btn-sm" id="btn-add-collab" onclick="promptAddCollaborator()">+ Invite</button>
+                <span style="color: #ccc; margin: 0 10px;">|</span>
+                
+                <span style="font-weight: 600; color:#2c3e50;">Tools:</span>
+                <button class="tool-btn active" id="tool-platform" onclick="setTool('platform')">Place Block</button>
+                <button class="tool-btn" id="tool-erase" onclick="setTool('erase')">Erase Block</button>
+                <button class="tool-btn" id="tool-spawn" onclick="setTool('spawn')">Set Spawn</button>
+                <button class="tool-btn btn-danger" onclick="clearEditor()">Clear World</button>
+                
+                <div style="flex-grow: 1;"></div>
+                
+                <button class="btn btn-info btn-sm" id="btn-versions" onclick="showVersionsModal()" style="display:none; margin-right:10px;">Versions</button>
+
+                <select id="editor-group-publish" class="form-control" style="width: 120px; margin-right: 5px;">
+                    <option value="">My Profile</option>
+                </select>
+
+                <select id="editor-genre" class="form-control" style="width: 100px; margin-right: 5px;">
+                    <option value="Sandbox">Sandbox</option>
+                    <option value="Adventure">Adventure</option>
+                    <option value="Obby">Obby</option>
+                    <option value="Horror">Horror</option>
+                    <option value="Action">Action</option>
+                </select>
+            </div>
+            <div class="toolbar" style="background: #fdfdfd; margin-top: -10px;">
+                <input type="text" id="editor-tags" class="form-control" placeholder="Tags (comma separated, max 10)" style="width: 250px; margin-right: 10px;">
+                
+                <label style="font-size:12px; margin-right:5px;">Max Plrs:</label>
+                <input type="number" id="editor-max-players" class="form-control" value="20" min="1" max="500" style="width: 60px; margin-right: 10px;">
+                
+                <label style="font-size:12px; margin-right:5px;"><input type="checkbox" id="editor-ps-enabled"> Enable VIP Servers</label>
+                <input type="number" id="editor-ps-price" class="form-control" placeholder="Price (SC)" style="width: 80px; margin-right: 10px;">
+                
+                <div style="flex-grow: 1;"></div>
+                <input type="text" id="editor-title" class="form-control" placeholder="Game Title..." style="width: 150px; margin: 0; margin-right: 5px;">
+                <button class="btn btn-success" id="editor-save-btn" onclick="saveGame()">Publish Game</button>
+            </div>
+            
+            <div class="canvas-container">
+                <div id="editor-container-3d" tabindex="0"></div>
+                <div class="overlay-instruction">Right-Click & Drag to rotate camera. Left click to build. Infinite World.</div>
+            </div>
+        </div>
+
+        <!-- Play View -->
+        <div id="view-play" class="view text-center">
+            <div class="play-layout">
+                <!-- Game Card -->
+                <div class="card play-game-card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 10px;">
+                        <div>
+                            <h2 class="card-title" id="play-title" style="margin: 0; border: none; padding: 0;">Game Title</h2>
+                            <p style="margin: 5px 0 0 0; color: #7f8c8d; font-size: 14px;">By <span id="play-author" style="cursor: pointer; color: #3498db; text-decoration: underline;"></span></p>
+                            <div id="play-tags-container" style="margin-top:5px;"></div>
+                        </div>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <span style="font-size: 14px; font-weight: bold; color: #3498db;">▶️ <span id="play-count">0</span> Plays</span>
+                            <button id="btn-like-game" class="btn btn-sm" style="background-color: #e84393; border-bottom-color: #d63031;" onclick="toggleGameLike()">❤️ Like (<span id="play-likes">0</span>)</button>
+                            <button id="btn-save-game" class="btn btn-sm btn-info" onclick="toggleBookmarkFromPlay()">⭐ Save</button>
+                            <button class="btn btn-sm btn-dark" onclick="shareGame()">🔗 Share</button>
+                            <button class="btn btn-sm" onclick="navigate('library')">Exit Game</button>
+                        </div>
+                    </div>
+
+                    <div class="tabs mt-10" style="margin-bottom:10px;">
+                        <div class="tab active" onclick="switchPlayTab('game')">Game</div>
+                        <div class="tab" onclick="switchPlayTab('servers')">Servers</div>
+                    </div>
+                    
+                    <div id="tab-play-game" class="tab-content active">
+                        <div class="canvas-container">
+                            <div id="play-container-3d" tabindex="0"></div>
+                            <div id="nametags-container"></div>
+                            
+                            <!-- Mobile Controls -->
+                            <div id="mobile-controls" style="display:none; position: absolute; bottom: 20px; left: 0; width: 100%; height: 120px; pointer-events: none; z-index: 20;">
+                                <div style="position: absolute; left: 20px; bottom: 0; width: 120px; height: 120px; pointer-events: auto;">
+                                    <div id="btn-up" class="mobile-btn" style="position:absolute; top:0; left:40px; width:40px; height:40px;">W</div>
+                                    <div id="btn-down" class="mobile-btn" style="position:absolute; bottom:0; left:40px; width:40px; height:40px;">S</div>
+                                    <div id="btn-left" class="mobile-btn" style="position:absolute; top:40px; left:0; width:40px; height:40px;">A</div>
+                                    <div id="btn-right" class="mobile-btn" style="position:absolute; top:40px; right:0; width:40px; height:40px;">D</div>
+                                </div>
+                                <div style="position: absolute; right: 20px; bottom: 0; width: 60px; height: 60px; pointer-events: auto;">
+                                    <div id="btn-jump" class="mobile-btn" style="width:100%; height:100%;">^</div>
+                                </div>
+                            </div>
+
+                            <div class="overlay-instruction" id="play-instruction">WASD to move, SPACE to jump. Click & drag to rotate camera! Scroll to zoom into First-Person.</div>
+                        </div>
+                    </div>
+
+                    <div id="tab-play-servers" class="tab-content text-left" style="text-align: left;">
+                        <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                            <div style="flex:1;">
+                                <h3>Public Servers</h3>
+                                <div id="play-public-servers"></div>
+                            </div>
+                            <div style="flex:1;" id="play-private-servers-container">
+                                <h3>Private VIP Servers</h3>
+                                <div id="play-ps-purchase" style="margin-bottom:15px; padding:10px; background:#f9f9f9; border:1px solid #ddd; border-radius:4px;">
+                                    <p style="margin:0 0 10px 0;">Price: <strong id="play-ps-price">0 SC</strong></p>
+                                    <button class="btn btn-success btn-sm" onclick="buyPrivateServer()">Buy Private Server</button>
+                                </div>
+                                <div id="play-ps-mine" style="display:none; margin-bottom:15px; padding:10px; background:#e1f8e1; border:1px solid #2ecc71; border-radius:4px;">
+                                    <!-- Rendered dynamically -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Update Log Sidebar -->
+                <div class="card play-sidebar">
+                    <h3 style="margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 10px; color: #2c3e50;">Update Log</h3>
+                    
+                    <div id="post-update-section" style="display:none; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px dashed #ccc;">
+                        <input type="text" id="update-text" class="form-control" placeholder="What's new?">
+                        <button class="btn btn-success btn-sm mt-10" style="width:100%;" onclick="postGameUpdate()">Post Update</button>
+                    </div>
+
+                    <div id="play-updates-list"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="message-modal" class="modal-overlay">
+        <div class="modal-box">
+            <h3 id="modal-title">Notification</h3>
+            <p id="modal-desc"></p>
+            <div id="modal-input-container" style="display:none; margin: 15px 0;">
+                <input type="text" id="modal-input" class="form-control" placeholder="...">
+            </div>
+            <div class="flex-center">
+                <button class="btn" id="modal-btn" onclick="closeModal()">OK</button>
+                <button class="btn btn-danger" id="modal-cancel-btn" style="display:none;" onclick="closeModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Private Server Manage Modal -->
+    <div id="ps-manage-modal" class="modal-overlay">
+        <div class="modal-box text-left" style="text-align: left; max-width: 400px;">
+            <h3 style="margin-top:0;">Manage Private Server</h3>
+            <label style="display:block; margin-bottom:5px;"><input type="checkbox" id="ps-join-enabled"> Allow Joining via Link/Whitelist</label>
+            <label style="display:block; margin-bottom:15px;"><input type="checkbox" id="ps-friends-only"> Friends Only</label>
+            <button class="btn btn-sm btn-info" onclick="savePsSettings()">Save Settings</button>
+            <hr style="margin: 15px 0;">
+            <h4 style="margin-top:0; margin-bottom:10px;">Whitelist Members</h4>
+            <div style="display:flex; gap:10px; margin-bottom:10px;">
+                <input type="text" id="ps-whitelist-add" class="form-control" placeholder="Username" style="margin:0;">
+                <button class="btn btn-success btn-sm" onclick="addPsWhitelist()">Add</button>
+            </div>
+            <div id="ps-whitelist-list" style="max-height:100px; overflow-y:auto; border:1px solid #ccc; padding:5px; border-radius:3px;"></div>
+            <hr style="margin: 15px 0;">
+            <h4 style="margin-top:0; margin-bottom:10px;">Share Link (Expires in 3 Hrs)</h4>
+            <button class="btn btn-sm btn-warning mb-10" onclick="generatePsLink()">Generate Link</button>
+            <input type="text" id="ps-share-link" class="form-control" readonly style="display:none; font-size:11px;">
+            
+            <div style="text-align:center; margin-top:20px;">
+                <button class="btn btn-sm" onclick="document.getElementById('ps-manage-modal').style.display='none'">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="versions-modal" class="modal-overlay">
+        <div class="modal-box" style="max-width: 600px;">
+            <h3 style="margin-top:0;">Version History</h3>
+            <p style="font-size:12px; color:#777;">Click a previous version to rollback the game data.</p>
+            <div id="versions-list" style="max-height: 400px; overflow-y:auto; text-align:left;"></div>
+            <button class="btn mt-20" onclick="document.getElementById('versions-modal').style.display='none';">Close</button>
+        </div>
+    </div>
+
+    <script>
+        // --- State Management ---
+        const API_BASE = '/api';
+        let currentUser = null; 
+        const accImageCache = {}; 
+        let isDragging = false; 
+        let isDrawingAcc = false; 
+
+        // Generate Procedural Grass Texture
+        const createGrassTexture = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = 64; canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#55aa55'; ctx.fillRect(0,0,64,64);
+            for(let i=0; i<400; i++) {
+                ctx.fillStyle = Math.random() > 0.5 ? '#4da64d' : '#3e8e3e';
+                ctx.fillRect(Math.floor(Math.random()*64), Math.floor(Math.random()*64), 2, 2);
+            }
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.magFilter = THREE.NearestFilter;
+            return tex;
+        };
+        const grassMat = new THREE.MeshLambertMaterial({ map: createGrassTexture() });
+
+        // --- Core Application Logic (Economy, Modals, Nav) ---
+        const getCoins = () => currentUser ? (currentUser.coins || 0) : 0;
+        const getBoosts = () => currentUser ? (currentUser.boosts || 0) : 0;
+
+        const updateCoinsUI = () => {
+            if(document.getElementById('nav-coins')) document.getElementById('nav-coins').innerText = getCoins();
+            if(document.getElementById('dash-coins')) document.getElementById('dash-coins').innerText = getCoins();
+            if(document.getElementById('nav-boosts')) document.getElementById('nav-boosts').innerText = getBoosts();
+        };
+
+        const addCoins = (amount) => {
+            if (!currentUser) return;
+            localStorage.setItem('sc_' + currentUser.userId, getCoins() + amount);
+            updateCoinsUI();
+        };
+
+        const deductCoins = (amount) => {
+            if (!currentUser) return false;
+            let current = getCoins();
+            if (current >= amount) {
+                localStorage.setItem('sc_' + currentUser.userId, current - amount);
+                updateCoinsUI();
+                return true;
+            }
+            return false;
+        };
+
+        const showModal = (title, desc, btnText = 'OK', action = null, showInput = false, cancelable = false) => {
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-desc').innerText = desc;
+            document.getElementById('modal-input-container').style.display = showInput ? 'block' : 'none';
+            if(showInput) document.getElementById('modal-input').value = '';
+            document.getElementById('modal-cancel-btn').style.display = cancelable ? 'inline-block' : 'none';
+            const btn = document.getElementById('modal-btn');
+            btn.innerText = btnText;
+            btn.onclick = () => {
+                const inputVal = showInput ? document.getElementById('modal-input').value : null;
+                closeModal();
+                if(action) action(inputVal);
+            };
+            document.getElementById('message-modal').style.display = 'flex';
+        };
+        const closeModal = () => document.getElementById('message-modal').style.display = 'none';
+
+        const apiCall = async (endpoint, method = 'GET', body = null) => {
+            const headers = { 'Content-Type': 'application/json' };
+            const token = localStorage.getItem('ps_token');
+            if (token) headers['Authorization'] = token;
+            
+            const config = { method, headers };
+            if (body) config.body = JSON.stringify(body);
+            
+            const res = await fetch(API_BASE + endpoint, config);
+            const data = await res.json();
+            
+            if (!res.ok) throw new Error(data.error || 'Server Error');
+            
+            // Keep frontend currencies up to date
+            if (data.coins !== undefined && currentUser) { currentUser.coins = data.coins; updateCoinsUI(); }
+            if (data.boosts !== undefined && currentUser) { currentUser.boosts = data.boosts; updateCoinsUI(); }
+            
+            return data;
+        };
+
+        const formatDuration = (msTimestamp) => {
+            const diff = Math.max(0, Date.now() - msTimestamp);
+            const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+            return `${days} days, ${hours} hours`;
+        };
+
+        let currentAnalyticsGameId = null;
+
+        const searchByTag = (tag) => {
+            document.getElementById('game-search').value = tag;
+            navigate('library');
+        };
+
+        const renderGameCard = (g, isCreator = false) => {
+            const tagsHtml = (g.tags || []).map(t => `<span class="badge-pill badge-dark" style="cursor:pointer; font-size:9px;" onclick="searchByTag('${t}'); event.stopPropagation();">#${t}</span>`).join('');
+            return `
+                <div class="game-card">
+                    <span class="badge-pill badge-genre" style="float:right; margin-right:0;">${g.genre || 'Sandbox'}</span>
+                    <h3 style="text-align:left; margin-bottom:5px;">${g.title}</h3>
+                    <p style="font-size:11px; text-align:left; margin-bottom:5px;">By <a href="javascript:void(0)" onclick="if('${g.groupId}' && '${g.groupId}' !== 'undefined' && '${g.groupId}' !== 'null') { loadGroupDetail('${g.groupId}'); } else { loadProfile('${g.authorName}'); navigate('profile'); }" style="color:#3498db;">${g.authorName}</a></p>
+                    <div style="text-align:left; margin-bottom:10px;">${tagsHtml}</div>
+                    <div class="game-stats">
+                        <span class="plays">▶️ ${g.plays || 0}</span>
+                        <span>❤️ ${g.likes || 0}</span>
+                    </div>
+                    <div class="game-actions">
+                        <button class="btn btn-success btn-sm" onclick="loadGame('${g.id}')">Play</button>
+                        <button class="btn btn-info btn-sm" onclick="toggleBookmark('${g.id}')">⭐ Save</button>
+                        ${isCreator ? `<button class="btn btn-warning btn-sm" onclick="editExistingGame('${g.id}')">Edit</button>` : ''}
+                        ${isCreator ? `<button class="btn btn-info btn-sm" onclick="loadAnalytics('${g.id}')">📊 Analytics</button>` : ''}
+                        <button class="btn btn-danger btn-sm" onclick="boostGame('${g.id}')" title="Costs 5 Boosts">🚀 Boost</button>
+                    </div>
+                </div>
+            `;
+        };
+
+        const loadAnalytics = async (gameId) => {
+            if(gameId) currentAnalyticsGameId = gameId;
+            if(!currentAnalyticsGameId) return;
+
+            const timeframe = document.getElementById('analytics-timeframe').value;
+            try {
+                const data = await apiCall(`/games/${currentAnalyticsGameId}/analytics?timeframe=${timeframe}`);
+                document.getElementById('analytics-plays').innerText = data.totalPlays;
+                document.getElementById('analytics-revenue').innerText = data.totalRevenue + ' SC';
+                document.getElementById('analytics-likes').innerText = data.totalLikes;
+                document.getElementById('analytics-peak').innerText = data.peakHourStr;
+                document.getElementById('analytics-source').innerText = data.topSource;
+                document.getElementById('analytics-retention').innerText = data.retention + '%';
+                document.getElementById('analytics-session').innerText = data.avgSession + 'm';
+                document.getElementById('analytics-concurrent').innerText = data.peakConcurrent;
+                
+                const gameInfo = await apiCall(`/games/${currentAnalyticsGameId}`);
+                document.getElementById('analytics-game-title').innerText = gameInfo.title;
+
+                navigate('analytics');
+            } catch(e) {
+                showModal('Error', e.message);
+            }
+        };
+
+        const toggleBookmark = async (gameId) => {
+            if (!currentUser) return showModal('Hold up!', 'You need to be logged in to save games.');
+            try {
+                await apiCall(`/games/${gameId}/bookmark`, 'POST');
+                if(document.getElementById('view-dashboard').classList.contains('active')) loadDashboardGames(); 
+            } catch (e) {
+                showModal('Error', e.message);
+            }
+        };
+        
+        const toggleBookmarkFromPlay = async () => {
+            if (!currentPlayGameId) return;
+            if (!currentUser) return showModal('Hold up!', 'You need to be logged in to save games.');
+            try {
+                const res = await apiCall(`/games/${currentPlayGameId}/bookmark`, 'POST');
+                const btn = document.getElementById('btn-save-game');
+                if (res.isBookmarked) {
+                    btn.innerText = '⭐ Saved';
+                    btn.classList.add('btn-success');
+                    btn.classList.remove('btn-info');
+                } else {
+                    btn.innerText = '⭐ Save';
+                    btn.classList.remove('btn-success');
+                    btn.classList.add('btn-info');
+                }
+            } catch(e) {
+                showModal('Error', e.message);
+            }
+        };
+
+        const shareGame = () => {
+            if (!currentPlayGameId) return;
+            const url = window.location.origin + '/?game=' + currentPlayGameId;
+            const input = document.createElement('input');
+            input.value = url;
+            document.body.appendChild(input);
+            input.select();
+            document.execCommand('copy');
+            document.body.removeChild(input);
+            showModal('Copied!', 'Game link copied to clipboard.');
+        };
+
+        const boostGame = async (gameId) => {
+            if (!currentUser) return showModal('Login Required', 'You must be logged in to boost games.');
+            if (getBoosts() < 5) return showModal('Not Enough Boosts', 'You need 5 Boosts to launch a game. Log in daily to earn more!');
+            
+            try {
+                await apiCall(`/games/${gameId}/boost`, 'POST');
+                showModal('Boosted!', 'This game has been sent to the Playsculpt Launchpad!');
+                if(document.getElementById('view-dashboard').classList.contains('active')) loadDashboardGames(); 
+            } catch(e) {
+                showModal('Error', e.message);
+            }
+        };
+
+        const cacheAccessoryImage = (id, jsonPayloadStr) => {
+            if (!accImageCache[id] && jsonPayloadStr) {
+                try {
+                    const parsed = JSON.parse(jsonPayloadStr);
+                    accImageCache[id] = parsed;
+                } catch(e) {
+                    accImageCache[id] = { img: jsonPayloadStr, voxels: null };
+                }
+            }
+        };
+
+        // Resize Canvas dynamically
+        const resizeCanvas = (renderer, camera, containerId) => {
+            const container = document.getElementById(containerId);
+            if(!container || !renderer || !camera) return;
+            const width = container.clientWidth;
+            const height = container.clientHeight || (width * (9/16));
+            renderer.setSize(width, height);
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+        };
+
+        window.addEventListener('resize', () => {
+            if (playRenderer && document.getElementById('view-play').classList.contains('active')) resizeCanvas(playRenderer, playCamera, 'play-container-3d');
+            if (edRenderer && document.getElementById('view-create').classList.contains('active')) resizeCanvas(edRenderer, edCamera, 'editor-container-3d');
+            if (accRenderer && document.getElementById('view-shop').classList.contains('active')) {
+                const c = document.getElementById('acc-editor-3d');
+                accRenderer.setSize(c.clientWidth, c.clientHeight);
+                accCamera.aspect = c.clientWidth / c.clientHeight;
+                accCamera.updateProjectionMatrix();
+            }
+        });
+
+        const setupMobileControls = () => {
+            const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+            if (isTouch) {
+                document.getElementById('mobile-controls').style.display = 'block';
+                document.getElementById('play-instruction').innerText = "Use on-screen controls to move. Swipe anywhere to look around.";
+                
+                const bindBtn = (id, key) => {
+                    const btn = document.getElementById(id);
+                    btn.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); keys[key] = true; }, {passive: false});
+                    btn.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); keys[key] = false; }, {passive: false});
+                };
+                bindBtn('btn-up', 'w'); bindBtn('btn-down', 's');
+                bindBtn('btn-left', 'a'); bindBtn('btn-right', 'd');
+                bindBtn('btn-jump', 'space');
+            }
+        };
+
+        const resetGlobalInteractionStates = () => {
+            isDragging = false;
+            if (typeof edControls !== 'undefined' && edControls) edControls.enabled = true;
+            isDrawingAcc = false;
+            if (typeof accControls !== 'undefined' && accControls) accControls.enabled = true;
+            for(let k in keys) keys[k] = false;
+        };
+
+        const updateNav = () => {
+            if (currentUser) {
+                document.getElementById('nav-logged-out').style.display = 'none';
+                document.getElementById('nav-logged-in').style.display = 'flex';
+                updateCoinsUI();
+            } else {
+                document.getElementById('nav-logged-out').style.display = 'flex';
+                document.getElementById('nav-logged-in').style.display = 'none';
+            }
+        };
+
+        const navigateProfile = () => {
+            if (currentUser) { 
+                currentProfTab = 'created';
+                loadProfile(currentUser.username); 
+                navigate('profile'); 
+            }
+        };
+
+        // Interval cleanup references
+        let grpWallSyncInterval = null;
+
+        const navigate = (viewId) => {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.getElementById('view-' + viewId).classList.add('active');
+            
+            resetGlobalInteractionStates();
+
+            if (viewId !== 'play') stopGameLoop();
+            if (viewId !== 'create') stopTeamSync(); 
+            if (viewId !== 'shop') stopAccEditorLoop();
+            if (viewId !== 'group-detail') if(grpWallSyncInterval) clearInterval(grpWallSyncInterval);
+            
+            if (viewId === 'landing') {
+                loadLaunchpadGames();
+            } else if (viewId === 'dashboard' && currentUser) {
+                document.getElementById('dash-username').innerText = currentUser.username;
+                updateCoinsUI();
+                loadDashboardGames();
+            } else if (viewId === 'library') {
+                loadLibrary();
+            } else if (viewId === 'groups') {
+                loadGroupsList();
+            } else if (viewId === 'shop') {
+                switchShopTab('market');
+                loadShop();
+                setTimeout(() => {
+                    initAccEditor();
+                    window.dispatchEvent(new Event('resize')); 
+                }, 50);
+            } else if (viewId === 'friends') {
+                loadFriendsTab();
+            } else if (viewId === 'messages') {
+                loadMessages();
+            } else if (viewId === 'settings') {
+                if (currentUser) {
+                    document.getElementById('setting-username').value = currentUser.username;
+                    loadLoginHistory();
+                }
+            } else if (viewId === 'create') {
+                if (!currentEditGameId) {
+                    setTimeout(() => { 
+                        initEditor(); 
+                        window.dispatchEvent(new Event('resize')); 
+                        populateGroupPublishDropdown(); 
+                    }, 50);
+                    document.getElementById('editor-save-btn').innerText = "Publish Game";
+                    document.getElementById('btn-add-collab').style.display = "none";
+                    document.getElementById('btn-versions').style.display = "none";
+                } else {
+                    document.getElementById('editor-save-btn').innerText = "Save Updates & Exit";
+                    document.getElementById('btn-add-collab').style.display = "inline-block";
+                    document.getElementById('btn-versions').style.display = "inline-block";
+                    startTeamSync();
+                    setTimeout(() => {
+                        initEditor(); // Ensure initialized when reopening
+                        window.dispatchEvent(new Event('resize'));
+                    }, 50);
+                }
+            }
+        };
+
+        // --- Auth, Account, Settings, Daily Login ---
+        const checkDailyReward = async () => {
+            try {
+                const res = await apiCall('/me/daily-reward', 'POST');
+                if (res.rewarded) {
+                    showModal('Daily Reward!', `🔥 Streak: ${res.streak} Days!\nYou earned ${res.boosts} Boost(s) and ${res.coins} SculptCoins!${res.milestone ? '\n\n🎉 Milestone Bonus: +300 SC!' : ''}`);
+                }
+            } catch(e) {}
+        };
+
+        const checkSession = async () => {
+            const token = localStorage.getItem('ps_token');
+            if (token) {
+                try {
+                    currentUser = await apiCall('/restore', 'GET');
+                    updateNav(); 
+                    navigate('dashboard');
+                    checkDailyReward();
+                } catch(e) {
+                    localStorage.removeItem('ps_token');
+                    updateNav(); navigate('landing');
+                }
+            } else {
+                navigate('landing');
+            }
+        };
+
+        const signup = async () => {
+            const user = document.getElementById('signup-user').value;
+            const pass = document.getElementById('signup-pass').value;
+            try {
+                const data = await apiCall('/signup', 'POST', { username: user, password: pass });
+                localStorage.setItem('ps_token', data.token);
+                currentUser = data;
+                updateNav(); navigate('dashboard');
+                checkDailyReward();
+            } catch (e) {
+                showModal('Error', e.message);
+            }
+        };
+
+        const login = async () => {
+            const user = document.getElementById('login-user').value;
+            const pass = document.getElementById('login-pass').value;
+            try {
+                const data = await apiCall('/login', 'POST', { username: user, password: pass });
+                localStorage.setItem('ps_token', data.token);
+                currentUser = data;
+                updateNav(); navigate('dashboard');
+                checkDailyReward();
+            } catch (e) {
+                showModal('Error', e.message);
+            }
+        };
+
+        const logout = async () => {
+            if (currentUser) {
+                try { await apiCall('/logout', 'POST'); } catch (e) {}
+                localStorage.removeItem('ps_token');
+                currentUser = null; updateNav(); navigate('landing');
+            }
+        };
+
+        const saveSettings = async () => {
+            const newUsername = document.getElementById('setting-username').value.trim();
+            const newPassword = document.getElementById('setting-password').value;
+            try {
+                const res = await apiCall('/me/settings', 'PUT', { newUsername, newPassword });
+                showModal('Success', res.message);
+                if (res.username && currentUser) {
+                    currentUser.username = res.username;
+                    updateNav();
+                }
+                document.getElementById('setting-password').value = '';
+            } catch (e) {
+                showModal('Error', e.message);
+            }
+        };
+
+        const loadLoginHistory = async () => {
+            try {
+                const history = await apiCall('/me/login-history');
+                const container = document.getElementById('settings-login-history');
+                container.innerHTML = history.length === 0 ? '<p>No history found.</p>' : '';
+                history.forEach(h => {
+                    container.innerHTML += `<div style="border-bottom:1px dashed #ccc; margin-bottom:5px; padding-bottom:5px;">
+                        <strong>${new Date(h.time).toLocaleString()}</strong><br>
+                        Device/Browser: ${h.userAgent}
+                    </div>`;
+                });
+            } catch(e) {
+                console.error(e);
+            }
+        };
+
+        // --- Messaging ---
+        const loadMessages = async () => {
+            try {
+                const msgs = await apiCall('/messages');
+                const list = document.getElementById('messages-list');
+                list.innerHTML = msgs.length === 0 ? '<p style="color:#7f8c8d;">Your inbox is empty.</p>' : '';
+                msgs.forEach(m => {
+                    const d = new Date(m.timestamp).toLocaleString();
+                    list.innerHTML += `
+                        <div class="list-item" style="align-items: flex-start; flex-direction: column; padding: 15px 10px;">
+                            <div style="width: 100%; display: flex; justify-content: space-between;">
+                                <strong>From: <a href="javascript:void(0)" onclick="loadProfile('${m.fromUsername}'); navigate('profile');" style="color:#3498db;">${m.fromUsername}</a></strong>
+                                <span style="font-size:11px; color:#777;">${d}</span>
+                            </div>
+                            <p style="margin: 8px 0; font-size: 14px;">${m.text}</p>
+                            <button class="btn btn-sm btn-info" onclick="promptMessage('${m.fromUsername}')">Reply</button>
+                        </div>
+                    `;
+                });
+            } catch(e) {
+                showModal('Error', e.message);
+            }
+        };
+
+        const promptMessage = (username) => {
+            let targetUser = username || currentProfileData.username;
+            showModal(`Message ${targetUser}`, 'Type your message below:', 'Send', async (text) => {
+                if(!text || text.trim() === '') return;
+                try {
+                    await apiCall(`/users/${targetUser}/message`, 'POST', { text });
+                    showModal('Sent', 'Your message has been sent!');
+                } catch(e) {
+                    showModal('Error', e.message);
+                }
+            }, true, true);
+        };
+
+        // --- Searches ---
+        const executeUserSearch = async () => {
+            const query = document.getElementById('nav-search').value.trim();
+            if (!query) return;
+            try {
+                const results = await apiCall(`/users/search?q=${encodeURIComponent(query)}`);
+                const grid = document.getElementById('search-results-grid');
+                grid.innerHTML = results.length === 0 ? '<p>No users found.</p>' : '';
+                results.forEach(u => {
+                    const card = document.createElement('div');
+                    card.className = 'user-card';
+                    card.onclick = () => { loadProfile(u.username); navigate('profile'); };
+                    card.innerHTML = `<h4><span class="status-dot ${u.isOnline ? 'online' : 'offline'}"></span> ${u.username}</h4>`;
+                    grid.appendChild(card);
+                });
+                navigate('search');
+            } catch(e) {
+                showModal('Error', e.message);
+            }
+        };
+
+        // --- Friends Tab ---
+        const loadFriendsTab = async () => {
+            try {
+                const myData = await apiCall('/me');
+                
+                const reqList = document.getElementById('friend-requests-list');
+                reqList.innerHTML = myData.requests.length === 0 ? '<p style="color:#7f8c8d;">No pending requests.</p>' : '';
+                myData.requests.forEach(r => {
+                    const div = document.createElement('div'); div.className = 'list-item';
+                    div.innerHTML = `<strong>${r.username}</strong><div><button class="btn btn-success btn-sm" onclick="respondFriendReq('${r.username}', true)">Accept</button> <button class="btn btn-danger btn-sm" onclick="respondFriendReq('${r.username}', false)">Decline</button></div>`;
+                    reqList.appendChild(div);
+                });
+
+                const frList = document.getElementById('my-friends-list');
+                frList.innerHTML = myData.friends.length === 0 ? '<p style="color:#7f8c8d;">You have no friends yet. Use search to find some!</p>' : '';
+                myData.friends.forEach(f => {
+                    const div = document.createElement('div'); div.className = 'list-item';
+                    div.innerHTML = `<div><span class="status-dot ${f.isOnline ? 'online' : 'offline'}"></span><strong style="cursor:pointer; color:#3498db;" onclick="loadProfile('${f.username}'); navigate('profile');">${f.username}</strong><div style="font-size: 11px; color: #7f8c8d; margin-top:3px;">Friends for: ${formatDuration(f.addedAt)}</div></div><div><button class="btn btn-info btn-sm" onclick="promptMessage('${f.username}')">Message</button> <button class="btn btn-danger btn-sm" onclick="removeFriend('${f.username}')">Unfriend</button></div>`;
+                    frList.appendChild(div);
+                });
+            } catch(e) {
+                showModal('Error', e.message);
+            }
+        };
+
+        const respondFriendReq = async (username, accept) => {
+            try {
+                if (accept) await apiCall(`/users/${username}/accept-friend`, 'POST');
+                else await apiCall(`/users/${username}/reject-friend`, 'POST');
+                loadFriendsTab(); 
+            } catch(e) {
+                showModal('Error', e.message);
+            }
+        };
+
+        const removeFriend = async (username) => {
+            try { await apiCall(`/users/${username}/remove-friend`, 'POST'); loadFriendsTab(); } catch(e) {}
+        };
+
+        // --- Groups System (Advanced) ---
+        let currentGroupData = null;
+        let currentCategoryId = null;
+
+        const loadGroupsList = async () => {
+            try {
+                const groups = await apiCall('/groups');
+                const grid = document.getElementById('groups-list-grid');
+                grid.innerHTML = groups.length === 0 ? '<p>No groups created yet.</p>' : '';
+                groups.forEach(gr => {
+                    const card = document.createElement('div'); card.className = 'game-card';
+                    card.innerHTML = `
+                        <h3>${gr.name}</h3>
+                        <p>${gr.description}</p>
+                        <p style="font-size:12px; color:#777;">${gr.members} Members</p>
+                        <button class="btn btn-success btn-sm mt-10" onclick="loadGroupDetail('${gr.id}')">View Group</button>
+                    `;
+                    grid.appendChild(card);
+                });
+            } catch(e) {
+                showModal('Error', e.message);
+            }
+        };
+
+        const promptCreateGroup = () => {
+            showModal('Create a Group', 'Enter a name for your new group:', 'Create', async (name) => {
+                if(!name) return;
+                try {
+                    const res = await apiCall('/groups', 'POST', { name, description: 'A brand new group!' });
+                    loadGroupDetail(res.groupId);
+                } catch(e) {
+                    showModal('Error', e.message);
+                }
+            }, true, true);
+        };
+
+        const switchGroupTab = (tabId) => {
+            document.querySelectorAll('#view-group-detail .tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('#view-group-detail .tab-content').forEach(c => c.classList.remove('active'));
+            document.querySelector(`#view-group-detail .tab[onclick="switchGroupTab('${tabId}')"]`).classList.add('active');
+            document.getElementById(`tab-grp-${tabId}`).classList.add('active');
+            
+            if (tabId === 'forums') showForumCategories();
+        };
+
+        const updateGroupWallUI = () => {
+            if(!currentGroupData) return;
+            const wall = document.getElementById('grp-wall-list');
+            wall.innerHTML = currentGroupData.posts.length === 0 ? '<p style="color:#777;">No posts yet.</p>' : '';
+            currentGroupData.posts.forEach(p => {
+                const canDel = currentGroupData.myPerms && currentGroupData.myPerms.deletePosts;
+                wall.innerHTML += `<div style="border-bottom:1px solid #eee; padding:10px 0; position:relative;">
+                    ${canDel ? `<button class="btn btn-danger btn-sm" style="position:absolute; right:0; top:10px; padding:2px 6px;" onclick="deleteGroupPost('${p.id}')">X</button>` : ''}
+                    <div style="font-size:11px; color:#999; margin-bottom:5px;"><b>${p.authorName}</b> - ${new Date(p.timestamp).toLocaleString()}</div>
+                    <div>${p.text}</div>
+                </div>`;
+            });
+        };
+
+        const loadGroupDetail = async (groupId) => {
+            try {
+                if(grpWallSyncInterval) clearInterval(grpWallSyncInterval);
+
+                const group = await apiCall(`/groups/${groupId}`);
+                currentGroupData = group;
+                
+                document.getElementById('gd-name').innerText = group.name;
+                document.getElementById('gd-desc').innerText = group.description;
+                document.getElementById('gd-level').innerText = group.level || 1;
+                document.getElementById('gd-xp').innerText = group.xp || 0;
+                document.getElementById('gd-coins').innerText = group.coins;
+
+                const joinBtn = document.getElementById('btn-group-join');
+                const leaveBtn = document.getElementById('btn-group-leave');
+                const postForm = document.getElementById('grp-post-form');
+                const roleBadge = document.getElementById('gd-my-role');
+                const adminTab = document.getElementById('tab-btn-grp-admin');
+
+                if (group.myPerms) {
+                    joinBtn.style.display = 'none';
+                    if (group.myRank < 255) leaveBtn.style.display = 'inline-block'; 
+                    else leaveBtn.style.display = 'none';
+                    
+                    postForm.style.display = 'flex';
+                    roleBadge.style.display = 'inline-block';
+                    roleBadge.innerText = group.members.find(m=>m.userId === currentUser.userId).roleName;
+
+                    if (group.myPerms.manageRanks || group.myPerms.manageCategories || group.myPerms.kick || group.myPerms.managePayouts) {
+                        adminTab.style.display = 'block';
+                        populateAdminPanel();
+                    } else { adminTab.style.display = 'none'; }
+                } else {
+                    joinBtn.style.display = 'inline-block';
+                    leaveBtn.style.display = 'none';
+                    postForm.style.display = 'none';
+                    roleBadge.style.display = 'none';
+                    adminTab.style.display = 'none';
+                }
+
+                updateGroupWallUI();
+
+                // Events
+                const evList = document.getElementById('grp-events-list');
+                evList.innerHTML = group.events.length === 0 ? '<p style="color:#777;">No upcoming events.</p>' : '';
+                group.events.forEach(e => {
+                    evList.innerHTML += `<div style="border-bottom:1px solid #eee; padding:10px 0;">
+                        <strong style="color:#3498db; font-size:16px;">${e.name}</strong>
+                        <div style="font-size:12px; color:#555; margin:5px 0;">📅 ${new Date(e.datetime).toLocaleString()}</div>
+                        <div style="font-size:13px;">${e.description}</div>
+                        <div style="font-size:10px; color:#999; margin-top:5px;">Posted by ${e.authorName}</div>
+                    </div>`;
+                });
+                document.getElementById('grp-events-form').style.display = (group.myPerms && group.myPerms.manageEvents) ? 'block' : 'none';
+
+                // Members
+                const memList = document.getElementById('grp-members-list');
+                memList.innerHTML = '';
+                group.members.forEach(m => {
+                    const card = document.createElement('div'); card.className = 'user-card';
+                    card.onclick = () => { loadProfile(m.username); navigate('profile'); };
+                    card.innerHTML = `<h4><span class="status-dot ${m.isOnline ? 'online' : 'offline'}"></span> ${m.username}</h4><span class="badge-pill badge-genre">${m.roleName}</span>`;
+                    memList.appendChild(card);
+                });
+
+                // Games
+                const gamesGrid = document.getElementById('grp-games-grid');
+                gamesGrid.innerHTML = group.games.length === 0 ? '<p>This group has no games.</p>' : '';
+                group.games.forEach(g => {
+                    const canEdit = group.myPerms && group.myPerms.editGames;
+                    gamesGrid.innerHTML += renderGameCard(g, canEdit);
+                });
+
+                switchGroupTab('wall');
+                navigate('group-detail');
+
+                grpWallSyncInterval = setInterval(async () => {
+                    if (document.getElementById('view-group-detail').classList.contains('active') && currentGroupData) {
+                        try {
+                            const posts = await apiCall(`/groups/${currentGroupData.id}/wall`);
+                            currentGroupData.posts = posts;
+                            updateGroupWallUI();
+                        } catch(e) {}
+                    } else {
+                        clearInterval(grpWallSyncInterval);
+                    }
+                }, 3000);
+
+            } catch(e) {
+                showModal('Error', e.message);
+            }
+        };
+
+        const joinGroup = async () => {
+            if(!currentGroupData) return;
+            try { await apiCall(`/groups/${currentGroupData.id}/join`, 'POST'); loadGroupDetail(currentGroupData.id); } catch(e) { showModal('Error', e.message); }
+        };
+
+        const leaveGroup = async () => {
+            if(!currentGroupData) return;
+            try { await apiCall(`/groups/${currentGroupData.id}/leave`, 'POST'); loadGroupDetail(currentGroupData.id); } catch(e) { showModal('Error', e.message); }
+        };
+
+        const postToGroupWall = async () => {
+            if(!currentGroupData) return;
+            const text = document.getElementById('grp-post-text').value;
+            if(!text) return;
+            try {
+                const res = await apiCall(`/groups/${currentGroupData.id}/posts`, 'POST', { text });
+                document.getElementById('grp-post-text').value = '';
+                currentGroupData.posts = res.posts;
+                updateGroupWallUI();
+            } catch(e) {
+                showModal('Error', e.message);
+            }
+        };
+
+        const deleteGroupPost = async (postId) => {
+            if(!currentGroupData) return;
+            try {
+                await apiCall(`/groups/${currentGroupData.id}/posts/${postId}`, 'DELETE');
+                currentGroupData.posts = currentGroupData.posts.filter(p => p.id !== postId);
+                updateGroupWallUI();
+            } catch(e) {
+                showModal('Error', e.message);
+            }
+        };
+
+        // --- Events Logic ---
+        const createGroupEvent = async () => {
+            if(!currentGroupData) return;
+            const name = document.getElementById('grp-event-name').value.trim();
+            const description = document.getElementById('grp-event-desc').value.trim();
+            const datetime = document.getElementById('grp-event-date').value;
+            
+            if(!name || !datetime) return showModal('Error', 'Name and Date are required.');
+
+            try {
+                await apiCall(`/groups/${currentGroupData.id}/events`, 'POST', { name, description, datetime });
+                showModal('Success', 'Event scheduled!');
+                document.getElementById('grp-event-name').value = '';
+                document.getElementById('grp-event-desc').value = '';
+                document.getElementById('grp-event-date').value = '';
+                loadGroupDetail(currentGroupData.id);
+            } catch(e) {
+                showModal('Error', e.message);
+            }
+        };
+
+        // --- Forums Logic ---
+        const showForumCategories = () => {
+            document.getElementById('gf-categories-view').style.display = 'block';
+            document.getElementById('gf-threads-view').style.display = 'none';
+            document.getElementById('gf-thread-detail-view').style.display = 'none';
+            
+            const btnCreateCat = document.getElementById('gf-btn-create-cat');
+            btnCreateCat.style.display = (currentGroupData.myPerms && currentGroupData.myPerms.manageCategories) ? 'inline-block' : 'none';
+
+            const list = document.getElementById('gf-categories-list');
+            list.innerHTML = currentGroupData.categories.length === 0 ? '<p style="color:#777;">No categories created yet.</p>' : '';
+            currentGroupData.categories.forEach(c => {
+                const div = document.createElement('div'); div.className = 'forum-cat';
+                div.onclick = () => showForumThreads(c.id, c.title);
+                div.innerHTML = `<div><strong style="color:#3498db; font-size:16px;">${c.title}</strong><div style="font-size:12px; color:#777;">${c.description}</div></div><div>→</div>`;
+                list.appendChild(div);
+            });
+        };
+
+        const promptCreateCategory = () => {
+            showModal('New Category', 'Enter category title (max 15 allowed):', 'Create', async (title) => {
+                if(!title) return;
+                try {
+                    const res = await apiCall(`/groups/${currentGroupData.id}/categories`, 'POST', { title, description: 'Discuss ' + title });
+                    currentGroupData.categories = res.categories;
+                    showForumCategories();
+                } catch(e) {
+                    showModal('Error', e.message);
+                }
+            }, true, true);
+        };
+
+        const showForumThreads = async (catId, catTitle) => {
+            currentCategoryId = catId;
+            document.getElementById('gf-categories-view').style.display = 'none';
+            document.getElementById('gf-threads-view').style.display = 'block';
+            document.getElementById('gf-thread-detail-view').style.display = 'none';
+            
+            if(catTitle) document.getElementById('gf-cat-title').innerText = catTitle;
+            document.getElementById('gf-btn-create-thread').style.display = currentGroupData.myPerms ? 'inline-block' : 'none';
+
+            const list = document.getElementById('gf-threads-list');
+            list.innerHTML = '<p>Loading...</p>';
+            try {
+                const threads = await apiCall(`/groups/${currentGroupData.id}/forums/${catId}`);
+                list.innerHTML = threads.length === 0 ? '<p style="color:#777;">No threads yet. Be the first to post!</p>' : '';
+                threads.forEach(t => {
+                    const div = document.createElement('div'); div.className = 'forum-thread';
+                    div.onclick = () => showThreadDetail(t.id);
+                    div.innerHTML = `<div><strong style="color:#3498db;">${t.title}</strong><div style="font-size:11px; color:#777;">By ${t.authorName} - ${new Date(t.timestamp).toLocaleString()}</div></div><div class="badge-pill badge-genre">${t.repliesCount} replies</div>`;
+                    list.appendChild(div);
+                });
+            } catch(e) {
+                showModal('Error', e.message);
+            }
+        };
+
+        const promptCreateThread = () => {
+            showModal('New Thread', 'Enter thread title:', 'Next', (title) => {
+                if(!title) return;
+                showModal('New Thread', 'Enter your message:', 'Post', async (content) => {
+                    if(!content) return;
+                    try {
+                        await apiCall(`/groups/${currentGroupData.id}/forums/${currentCategoryId}`, 'POST', { title, content });
+                        showForumThreads(currentCategoryId);
+                    } catch(e) {
+                        showModal('Error', e.message);
+                    }
+                }, true, true);
+            }, true, true);
+        };
+
+        let currentThreadId = null;
+        const showThreadDetail = async (threadId) => {
+            currentThreadId = threadId;
+            document.getElementById('gf-threads-view').style.display = 'none';
+            document.getElementById('gf-thread-detail-view').style.display = 'block';
+            
+            try {
+                const thread = await apiCall(`/groups/${currentGroupData.id}/threads/${threadId}`);
+                document.getElementById('gf-td-title').innerText = thread.title;
+                document.getElementById('gf-td-content').innerHTML = `<strong>${thread.authorName}</strong> <span style="color:#777; font-size:11px;">${new Date(thread.timestamp).toLocaleString()}</span><p style="margin-top:10px;">${thread.content}</p>`;
+                
+                document.getElementById('gf-reply-form').style.display = currentGroupData.myPerms ? 'block' : 'none';
+                
+                const repList = document.getElementById('gf-td-replies');
+                repList.innerHTML = thread.replies.length === 0 ? '<p style="color:#777; font-size:12px;">No replies yet.</p>' : '';
+                thread.replies.forEach(r => {
+                    repList.innerHTML += `<div class="forum-reply"><strong>${r.authorName}</strong> <span style="color:#777; font-size:11px;">${new Date(r.timestamp).toLocaleString()}</span><p style="margin-top:5px; margin-bottom:0;">${r.content}</p></div>`;
+                });
+            } catch(e) {
+                showModal('Error', e.message);
+            }
+        };
+
+        const postThreadReply = async () => {
+            if(!currentThreadId) return;
+            const text = document.getElementById('gf-reply-text').value;
+            if(!text) return;
+            try {
+                const res = await apiCall(`/groups/${currentGroupData.id}/threads/${currentThreadId}/replies`, 'POST', { content: text });
+                document.getElementById('gf-reply-text').value = '';
+                showThreadDetail(currentThreadId);
+            } catch(e) {
+                showModal('Error', e.message);
+            }
+        };
+
+        // --- Admin Panel Logic ---
+        const populateAdminPanel = () => {
+            const rList = document.getElementById('grp-roles-list');
+            rList.innerHTML = '';
+            currentGroupData.roles.forEach(r => {
+                rList.innerHTML += `<div><strong>${r.name}</strong> (Rank: ${r.rank})</div>`;
+            });
+
+            const roleSelect = document.getElementById('grp-admin-role-select');
+            roleSelect.innerHTML = '';
+            currentGroupData.roles.forEach(r => {
+                if (r.rank < currentGroupData.myRank) { // Can only assign lower ranks
+                    roleSelect.innerHTML += `<option value="${r.id}">${r.name}</option>`;
+                }
+            });
+
+            // Payouts 
+            const payoutsDiv = document.getElementById('grp-admin-payouts');
+            if (currentGroupData.myPerms && currentGroupData.myPerms.managePayouts) {
+                payoutsDiv.style.display = 'block';
+                const pSel = document.getElementById('grp-payout-user');
+                pSel.innerHTML = '';
+                currentGroupData.members.forEach(m => {
+                    pSel.innerHTML += `<option value="${m.userId}">${m.username}</option>`;
+                });
+            } else {
+                payoutsDiv.style.display = 'none';
+            }
+        };
+
+        const promptCreateRole = () => {
+            showModal('New Role Name', 'Name:', 'Next', (name) => {
+                if(!name) return;
+                showModal('Role Rank', 'Enter Rank (1 to 254. Higher = more power):', 'Create Default Role', async (rank) => {
+                    try {
+                        const res = await apiCall(`/groups/${currentGroupData.id}/roles`, 'POST', { name, rank, permissions: {} });
+                        currentGroupData.roles = res.roles;
+                        populateAdminPanel();
+                        showModal('Success', 'Role created! (Permissions can be edited in future updates)');
+                    } catch(e) {
+                        showModal('Error', e.message);
+                    }
+                }, true, true);
+            }, true, true);
+        };
+
+        const adminSetRole = async () => {
+            const username = document.getElementById('grp-admin-mem-search').value.trim();
+            const roleId = document.getElementById('grp-admin-role-select').value;
+            if(!username || !roleId) return;
+            const target = currentGroupData.members.find(m => m.username.toLowerCase() === username.toLowerCase());
+            if(!target) return showModal('Error', 'Member not found in this group.');
+            try {
+                await apiCall(`/groups/${currentGroupData.id}/members/${target.userId}`, 'PUT', { roleId });
+                showModal('Success', 'Role updated!');
+                loadGroupDetail(currentGroupData.id); 
+            } catch(e) {
+                showModal('Error', e.message);
+            }
+        };
+
+        const adminKickUser = async () => {
+            const username = document.getElementById('grp-admin-mem-search').value.trim();
+            if(!username) return;
+            const target = currentGroupData.members.find(m => m.username.toLowerCase() === username.toLowerCase());
+            if(!target) return showModal('Error', 'Member not found in this group.');
+            try {
+                await apiCall(`/groups/${currentGroupData.id}/kick/${target.userId}`, 'POST');
+                showModal('Success', 'User kicked.');
+                loadGroupDetail(currentGroupData.id); 
+            } catch(e) {
+                showModal('Error', e.message);
+            }
+        };
+
+        const adminPayout = async () => {
+            if(!currentGroupData) return;
+            const targetUserId = document.getElementById('grp-payout-user').value;
+            const amount = parseInt(document.getElementById('grp-payout-amount').value);
+            if(!targetUserId || !amount || amount <= 0) return showModal('Error', 'Invalid amount or user.');
+
+            try {
+                await apiCall(`/groups/${currentGroupData.id}/payout`, 'POST', { targetUserId, amount });
+                showModal('Success', 'Funds distributed!');
+                document.getElementById('grp-payout-amount').value = '';
+                loadGroupDetail(currentGroupData.id);
+            } catch(e) {
+                showModal('Error', e.message);
+            }
+        };
+
+
+        const populateGroupPublishDropdown = async () => {
+            if (!currentUser) return;
+            try {
+                const myData = await apiCall('/me');
+                const sel = document.getElementById('editor-group-publish');
+                sel.innerHTML = '<option value="">My Profile</option>';
+                if (myData.myGroups) {
+                    myData.myGroups.forEach(gr => {
+                        if (gr.perms && gr.perms.editGames) {
+                            sel.innerHTML += `<option value="${gr.id}">Group: ${gr.name}</option>`;
+                        }
+                    });
+                }
+            } catch(e) {}
+        };
+
+        const setPrimaryGroup = async (groupId) => {
+            try {
+                await apiCall('/me/primary-group', 'PUT', { groupId });
+                loadProfile(currentUser.username);
+            } catch(e) {
+                showModal('Error', e.message);
+            }
+        };
+
+        // --- Profiles ---
+        let currentProfileData = null;
+        let currentProfTab = 'created';
+        const switchProfileTab = (tabId) => {
+            currentProfTab = tabId;
+            document.querySelectorAll('#view-profile .tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('#view-profile .tab-content').forEach(c => c.classList.remove('active'));
+            document.querySelector(`#view-profile .tab[onclick="switchProfileTab('${tabId}')"]`).classList.add('active');
+            document.getElementById(`tab-${tabId}`).classList.add('active');
+        };
+
+        const loadProfile = async (username) => {
+            try {
+                const profile = await apiCall(`/users/${username}`);
+                currentProfileData = profile;
+                
+                document.getElementById('prof-username').innerText = profile.username;
+                document.getElementById('prof-count').innerText = profile.gamesCreated;
+                document.getElementById('prof-followers-count').innerText = profile.followersCount;
+                document.getElementById('prof-online-dot').className = `status-dot ${profile.isOnline ? 'online' : 'offline'}`;
+                document.getElementById('prof-coins').innerText = localStorage.getItem('sc_' + profile.id) || '0';
+
+                // Setup Theme
+                document.getElementById('prof-theme-banner').style.backgroundColor = profile.profileTheme || '#ffffff';
+                const themeSect = document.getElementById('prof-theme-section');
+                if (currentUser && currentUser.username === profile.username) {
+                    themeSect.style.display = 'flex'; 
+                    document.getElementById('prof-theme-picker').value = profile.profileTheme || '#ffffff';
+                } else { 
+                    themeSect.style.display = 'none'; 
+                }
+
+                // Setup Status
+                document.getElementById('prof-status-text').innerText = profile.status || "No status set.";
+                if (currentUser && currentUser.username === profile.username) {
+                    document.getElementById('prof-edit-status-btn').style.display = 'inline-block';
+                } else {
+                    document.getElementById('prof-edit-status-btn').style.display = 'none';
+                }
+
+                const banner = document.getElementById('prof-primary-group-banner');
+                if (profile.primaryGroup) {
+                    banner.style.display = 'block';
+                    document.getElementById('prof-pg-name').innerText = profile.primaryGroup.name;
+                    document.getElementById('prof-pg-role').innerText = profile.primaryGroup.roleName;
+                } else {
+                    banner.style.display = 'none';
+                }
+
+                const badgeContainer = document.getElementById('prof-badges');
+                badgeContainer.innerHTML = '';
+                if (profile.badges && profile.badges.length > 0) {
+                    profile.badges.forEach(b => {
+                        let bClass = 'badge-pill';
+                        if (b === 'Gamer') bClass += ' badge-gamer';
+                        if (b === 'Creator') bClass += ' badge-creator';
+                        if (b === 'Critic') bClass += ' badge-critic';
+                        badgeContainer.innerHTML += `<span class="${bClass}">🏅 ${b}</span>`;
+                    });
+                } else {
+                    badgeContainer.innerHTML = `<span style="font-size:12px; color:#7f8c8d;">No badges earned yet.</span>`;
+                }
+
+                const avatarSect = document.getElementById('prof-avatar-section');
+                if (currentUser && currentUser.username === profile.username) {
+                    avatarSect.style.display = 'flex'; document.getElementById('prof-color-picker').value = profile.color || '#e74c3c';
+                } else { avatarSect.style.display = 'none'; }
+
+                const followBtn = document.getElementById('prof-follow-btn'), friendBtn = document.getElementById('prof-friend-btn'), msgBtn = document.getElementById('prof-message-btn');
+                if (currentUser && currentUser.username.toLowerCase() !== profile.username.toLowerCase()) {
+                    followBtn.style.display = 'inline-block'; followBtn.innerText = profile.isFollowing ? 'Unfollow' : 'Follow';
+                    friendBtn.style.display = 'inline-block'; msgBtn.style.display = 'none';
+                    if (profile.friendStatus === 'friends') {
+                        friendBtn.innerText = 'Remove Friend'; friendBtn.className = 'btn btn-danger btn-sm';
+                        msgBtn.style.display = 'inline-block'; msgBtn.innerText = 'Message';
+                    } else if (profile.friendStatus === 'pending_sent') {
+                        friendBtn.innerText = 'Request Sent'; friendBtn.className = 'btn btn-warning btn-sm';
+                    } else if (profile.friendStatus === 'pending_received') {
+                        friendBtn.innerText = 'Accept Request'; friendBtn.className = 'btn btn-success btn-sm';
+                    } else {
+                        friendBtn.innerText = 'Add Friend'; friendBtn.className = 'btn btn-success btn-sm';
+                    }
+                } else {
+                    followBtn.style.display = 'none'; friendBtn.style.display = 'none'; msgBtn.style.display = 'none';
+                }
+                
+                const renderGames = (gamesArray, elementId) => {
+                    const grid = document.getElementById(elementId);
+                    grid.innerHTML = gamesArray.length === 0 ? '<p>Nothing here yet.</p>' : '';
+                    gamesArray.forEach(g => {
+                        const canEdit = currentUser && currentUser.username === profile.username && elementId === 'prof-games';
+                        grid.innerHTML += renderGameCard(g, canEdit);
+                    });
+                };
+                renderGames(profile.games, 'prof-games');
+                renderGames(profile.likedGames, 'prof-liked-games');
+                
+                const gList = document.getElementById('prof-groups-list');
+                gList.innerHTML = profile.groups.length === 0 ? '<p>Not in any groups.</p>' : '';
+                profile.groups.forEach(g => {
+                    const card = document.createElement('div'); card.className = 'user-card';
+                    card.onclick = () => { loadGroupDetail(g.id); };
+                    let btnHtml = (currentUser && currentUser.username === profile.username) ? `<button class="btn btn-info btn-sm mt-10" onclick="event.stopPropagation(); setPrimaryGroup('${g.id}')">Set Primary</button>` : '';
+                    card.innerHTML = `<h4>${g.name}</h4><span class="badge-pill badge-genre">${g.roleName}</span><br>${btnHtml}`;
+                    gList.appendChild(card);
+                });
+
+                const friendsGrid = document.getElementById('prof-friends-list');
+                friendsGrid.innerHTML = profile.friends.length === 0 ? '<p>No friends yet.</p>' : '';
+                profile.friends.forEach(f => {
+                    const fCard = document.createElement('div'); fCard.className = 'user-card';
+                    fCard.onclick = () => { loadProfile(f.username); switchProfileTab('created'); };
+                    fCard.innerHTML = `<h4><span class="status-dot ${f.isOnline ? 'online' : 'offline'}"></span> ${f.username}</h4>`;
+                    friendsGrid.appendChild(fCard);
+                });
+
+                const invGrid = document.getElementById('prof-inventory-grid');
+                invGrid.innerHTML = (profile.inventory || []).length === 0 ? '<p>No accessories owned.</p>' : '';
+                (profile.inventory || []).forEach(i => {
+                    cacheAccessoryImage(i.id, i.image);
+                    const isEquipped = profile.equipped === i.id;
+                    const cached = accImageCache[i.id];
+                    const imgSrc = cached && cached.img ? cached.img : i.image; 
+                    const card = document.createElement('div'); card.className = 'game-card';
+                    card.innerHTML = `<img src="${imgSrc}" class="shop-img"><h3>${i.name}</h3>
+                        ${(currentUser && currentUser.username === profile.username) ? `<button class="btn ${isEquipped ? 'btn-danger' : 'btn-success'} btn-sm mt-10" onclick="equipItem('${i.id}', ${isEquipped})">${isEquipped ? 'Unequip' : 'Equip'}</button>` : ''}
+                    `;
+                    invGrid.appendChild(card);
+                });
+                
+                switchProfileTab(currentProfTab); 
+            } catch (e) { 
+                showModal('Error', e.message);
+                navigate('library'); 
+            }
+        };
+
+        const promptEditStatus = () => {
+            showModal('Set Status', 'What are you doing?', 'Save', async (status) => {
+                try {
+                    const res = await apiCall('/me/status', 'PUT', { status });
+                    if (currentUser) currentUser.status = res.status;
+                    loadProfile(currentUser.username);
+                } catch(e) { showModal('Error', e.message); }
+            }, true, true);
+        };
+
+        const updateProfileTheme = async () => {
+            const theme = document.getElementById('prof-theme-picker').value;
+            if (getCoins() < 25) return showModal('Insufficient Funds', 'You need 25 SC to change your theme.');
+            try {
+                const res = await apiCall('/me/theme', 'PUT', { theme });
+                if(currentUser) currentUser.profileTheme = res.theme;
+                loadProfile(currentUser.username);
+                showModal('Theme Updated', 'Your profile theme has been changed!');
+            } catch(e) { showModal('Error', e.message); }
+        };
+
+        const updateAvatarColor = async (color) => {
+            try {
+                const res = await apiCall('/me/color', 'PUT', { color });
+                if(currentUser) currentUser.color = res.color;
+                showModal('Success', 'Avatar color updated! It will show up in games.');
+            } catch(e) {}
+        };
+
+        const toggleFollow = async () => {
+            if (!currentProfileData || !currentUser) return;
+            try { await apiCall(`/users/${currentProfileData.username}/${currentProfileData.isFollowing ? 'unfollow' : 'follow'}`, 'POST'); loadProfile(currentProfileData.username); } catch (e) { showModal('Error', e.message); }
+        };
+
+        const toggleFriend = async () => {
+            if (!currentProfileData || !currentUser) return;
+            let endpoint = '';
+            if (currentProfileData.friendStatus === 'friends') endpoint = `/users/${currentProfileData.username}/remove-friend`;
+            else if (currentProfileData.friendStatus === 'pending_received') endpoint = `/users/${currentProfileData.username}/accept-friend`;
+            else if (currentProfileData.friendStatus === 'none') endpoint = `/users/${currentProfileData.username}/friend-request`;
+            else return; 
+            try { await apiCall(endpoint, 'POST'); loadProfile(currentProfileData.username); } catch (e) { showModal('Error', e.message); }
+        };
+
+        // --- 3D Shop Accessory Maker ---
+        let accScene, accCamera, accRenderer, accControls;
+        let accVoxels = []; // {x, y, z, color}
+        let accRollOverMesh, accGridHelper;
+        let accMode = 'camera'; 
+        let accAnimationId = null;
+        let dummyPlayerGrp; 
+
+        const switchShopTab = (tabId) => {
+            document.querySelectorAll('#view-shop .tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('#view-shop .tab-content').forEach(c => c.classList.remove('active'));
+            document.querySelector(`#view-shop .tab[onclick="switchShopTab('${tabId}')"]`).classList.add('active');
+            document.getElementById(`tab-shop-${tabId}`).classList.add('active');
+            if(tabId === 'make' && accRenderer) {
+                setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
+            }
+        };
+
+        const loadShop = async () => {
+            try {
+                const items = await apiCall('/shop/items');
+                const grid = document.getElementById('shop-grid');
+                grid.innerHTML = items.length === 0 ? '<p>No items in the marketplace yet.</p>' : '';
+                items.forEach(i => {
+                    cacheAccessoryImage(i.id, i.image);
+                    const cached = accImageCache[i.id];
+                    const imgSrc = cached && cached.img ? cached.img : i.image; 
+                    const card = document.createElement('div'); card.className = 'game-card';
+                    card.innerHTML = `<img src="${imgSrc}" class="shop-img"><h3>${i.name}</h3><p style="font-size:11px;">By <a href="javascript:void(0)" onclick="loadProfile('${i.authorName}'); navigate('profile');" style="color:#3498db;">${i.authorName}</a></p><p style="font-size:12px;">${i.description}</p><p style="color:#f39c12; font-weight:bold;">${i.price > 0 ? '💰 ' + i.price + ' SC' : 'Free'}</p><button class="btn btn-success btn-sm mt-10" onclick="buyItem('${i.id}', ${i.price})">Purchase</button>`;
+                    grid.appendChild(card);
+                });
+            } catch(e) {
+                showModal('Error', e.message);
+            }
+        };
+
+        const buyItem = async (itemId, price) => {
+            if (getCoins() < price) return showModal('Insufficient Funds', `You need ${price} SculptCoins to buy this.`);
+            try {
+                await apiCall(`/shop/buy/${itemId}`, 'POST');
+                showModal('Purchased!', 'The item is now in your profile inventory.');
+            } catch(e) {
+                showModal('Error', e.message);
+            }
+        };
+
+        const equipItem = async (itemId, isEquipped) => {
+            try {
+                const res = await apiCall(`/me/equip`, 'POST', { itemId: isEquipped ? null : itemId });
+                if(currentUser) currentUser.equipped = res.equipped;
+                loadProfile(currentUser.username); 
+            } catch(e) {
+                showModal('Error', e.message);
+            }
+        };
+
+        const setAccTool = (mode) => {
+            accMode = mode;
+            document.querySelectorAll('#tab-shop-make .tool-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('acc-tool-' + mode).classList.add('active');
+            
+            if(accControls) {
+                accControls.enabled = (mode === 'camera'); 
+            }
+            if(accRollOverMesh) {
+                accRollOverMesh.visible = (mode !== 'camera');
+                accRollOverMesh.material.color.setHex(mode === 'erase' ? 0xff0000 : 0x2ecc71);
+            }
+        };
+
+        const stopAccEditorLoop = () => {
+            if (accAnimationId) cancelAnimationFrame(accAnimationId);
+        };
+
+        const createPlayerMesh = (color, equippedId) => {
+            const group = new THREE.Group();
+            const mat = new THREE.MeshLambertMaterial({ color: color || '#e74c3c' });
+
+            const head = new THREE.Mesh(new THREE.BoxGeometry(4, 4, 4), mat);
+            head.position.set(0, 4, 0); 
+            group.add(head);
+
+            const torso = new THREE.Mesh(new THREE.BoxGeometry(4, 4, 2), mat);
+            torso.position.set(0, 0, 0);
+            group.add(torso);
+
+            const lArmPivot = new THREE.Group(); lArmPivot.position.set(-3, 1, 0);
+            const lArm = new THREE.Mesh(new THREE.BoxGeometry(2, 4, 2), mat); lArm.position.set(0, -1.5, 0);
+            lArmPivot.add(lArm); group.add(lArmPivot);
+
+            const rArmPivot = new THREE.Group(); rArmPivot.position.set(3, 1, 0);
+            const rArm = new THREE.Mesh(new THREE.BoxGeometry(2, 4, 2), mat); rArm.position.set(0, -1.5, 0);
+            rArmPivot.add(rArm); group.add(rArmPivot);
+
+            const lLegPivot = new THREE.Group(); lLegPivot.position.set(-1, -2, 0);
+            const lLeg = new THREE.Mesh(new THREE.BoxGeometry(2, 4, 2), mat); lLeg.position.set(0, -2, 0);
+            lLegPivot.add(lLeg); group.add(lLegPivot);
+
+            const rLegPivot = new THREE.Group(); rLegPivot.position.set(1, -2, 0);
+            const rLeg = new THREE.Mesh(new THREE.BoxGeometry(2, 4, 2), mat); rLeg.position.set(0, -2, 0);
+            rLegPivot.add(rLeg); group.add(rLegPivot);
+
+            group.userData = { lArmPivot, rArmPivot, lLegPivot, rLegPivot, swingTime: 0 };
+
+            if (equippedId && accImageCache[equippedId] && accImageCache[equippedId].voxels) {
+                const accGroup = new THREE.Group();
+                const vGeo = new THREE.BoxGeometry(1, 1, 1);
+                accImageCache[equippedId].voxels.forEach(v => {
+                    const vMat = new THREE.MeshLambertMaterial({color: v.color});
+                    const vMesh = new THREE.Mesh(vGeo, vMat);
+                    vMesh.position.set(v.x, v.y, v.z);
+                    accGroup.add(vMesh);
+                });
+                accGroup.scale.set(0.5, 0.5, 0.5); 
+                head.add(accGroup);
+            }
+
+            return group;
+        };
+
+        const initAccEditor = () => {
+            const container = document.getElementById('acc-editor-3d');
+            if (accRenderer) {
+                if(dummyPlayerGrp && currentUser) {
+                    dummyPlayerGrp.children.forEach(c => {
+                        if(c.material) c.material.color.setHex(parseInt((currentUser.color || '#e74c3c').replace('#','0x')));
+                    });
+                }
+                isDrawingAcc = false;
+                if(accAnimationId) cancelAnimationFrame(accAnimationId);
+                animateAcc(); 
+                return;
+            }
+
+            accScene = new THREE.Scene();
+            accScene.background = new THREE.Color(0x87CEEB);
+
+            accCamera = new THREE.PerspectiveCamera(45, 1, 1, 1000);
+            accCamera.position.set(15, 15, 25);
+            accCamera.lookAt(0, 4, 0);
+
+            const playerCol = currentUser ? currentUser.color : '#e74c3c';
+            dummyPlayerGrp = createPlayerMesh(playerCol, null);
+            accScene.add(dummyPlayerGrp);
+
+            accGridHelper = new THREE.GridHelper(16, 16);
+            accGridHelper.position.set(0, 0, 0); 
+            accScene.add(accGridHelper);
+
+            const headBoundsGeo = new THREE.BoxGeometry(4.2, 4.2, 4.2);
+            const headBoundsMat = new THREE.MeshBasicMaterial({ visible: false });
+            const headBounds = new THREE.Mesh(headBoundsGeo, headBoundsMat);
+            headBounds.position.set(0, 4, 0);
+            accScene.add(headBounds);
+
+            const rollOverGeo = new THREE.BoxGeometry(0.26, 0.26, 0.26); 
+            const rollOverMat = new THREE.MeshBasicMaterial({ color: 0x2ecc71, opacity: 0.5, transparent: true });
+            accRollOverMesh = new THREE.Mesh(rollOverGeo, rollOverMat);
+            accRollOverMesh.visible = false;
+            accScene.add(accRollOverMesh);
+
+            const ambientLight = new THREE.AmbientLight(0x606060);
+            accScene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff);
+            directionalLight.position.set(1, 0.75, 0.5).normalize();
+            accScene.add
