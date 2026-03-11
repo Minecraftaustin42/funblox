@@ -1213,6 +1213,9 @@
                 const res = await apiCall('/me/settings', 'PUT', { newUsername, newPassword });
                 await apiCall('/me/status', 'PUT', { statusMessage });
                 await apiCall('/me/bio', 'PUT', { bio });
+            try {
+                const res = await apiCall('/me/settings', 'PUT', { newUsername, newPassword });
+                await apiCall('/me/status', 'PUT', { statusMessage });
 
                 if (currentUser && currentUser.profileThemeColor !== themeColor) {
                     const themeRes = await apiCall('/me/theme-color', 'PUT', { color: themeColor });
@@ -1225,6 +1228,8 @@
                     if (res.username) currentUser.username = res.username;
                     currentUser.statusMessage = statusMessage;
                     currentUser.bio = bio;
+                    if (res.username) currentUser.username = res.username;
+                    currentUser.statusMessage = statusMessage;
                     updateNav();
                 }
                 document.getElementById('setting-password').value = '';
@@ -1339,44 +1344,44 @@
                     grid.appendChild(card);
                 });
             } catch(e) {}
-        };
+      };
 
-        const promptCreateGroup = () => {
-            showModal('Create a Group', 'Enter a name for your new group:', 'Create', async (name) => {
-                if(!name) return;
-                try {
-                    const res = await apiCall('/groups', 'POST', { name, description: 'A brand new group!' });
-                    loadGroupDetail(res.groupId);
-                } catch(e) {}
-            }, true, true);
-        };
+      const promptCreateGroup = () => {
+          showModal('Create a Group', 'Enter a name for your new group:', 'Create', async (name) => {
+              if(!name) return;
+              try {
+                  const res = await apiCall('/groups', 'POST', { name, description: 'A brand new group!' });
+                  loadGroupDetail(res.groupId);
+              } catch(e) {}
+          }, true, true);
+      };
 
-        const switchGroupTab = (tabId) => {
-            document.querySelectorAll('#view-group-detail .tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('#view-group-detail .tab-content').forEach(c => c.classList.remove('active'));
-            document.querySelector(`#view-group-detail .tab[onclick="switchGroupTab('${tabId}')"]`).classList.add('active');
-            document.getElementById(`tab-grp-${tabId}`).classList.add('active');
-            
-            if (tabId === 'forums') showForumCategories();
-        };
+      const switchGroupTab = (tabId) => {
+          document.querySelectorAll('#view-group-detail .tab').forEach(t => t.classList.remove('active'));
+          document.querySelectorAll('#view-group-detail .tab-content').forEach(c => c.classList.remove('active'));
+          document.querySelector(`#view-group-detail .tab[onclick="switchGroupTab('${tabId}')"]`).classList.add('active');
+          document.getElementById(`tab-grp-${tabId}`).classList.add('active');
 
-        const updateGroupWallUI = () => {
-            if(!currentGroupData) return;
-            const wall = document.getElementById('grp-wall-list');
-            wall.innerHTML = currentGroupData.posts.length === 0 ? '<p style="color:#777;">No posts yet.</p>' : '';
-            currentGroupData.posts.forEach(p => {
-                const canDel = currentGroupData.myPerms && currentGroupData.myPerms.deletePosts;
-                wall.innerHTML += `<div style="border-bottom:1px solid #eee; padding:10px 0; position:relative;">
-                    ${canDel ? `<button class="btn btn-danger btn-sm" style="position:absolute; right:0; top:10px; padding:2px 6px;" onclick="deleteGroupPost('${p.id}')">X</button>` : ''}
-                    <div style="font-size:11px; color:#999; margin-bottom:5px;"><b>${p.authorName}</b> - ${new Date(p.timestamp).toLocaleString()}</div>
-                    <div>${p.text}</div>
-                </div>`;
-            });
-        };
+          if (tabId === 'forums') showForumCategories();
+      };
 
-        const loadGroupDetail = async (groupId) => {
-            try {
-                if(grpWallSyncInterval) clearInterval(grpWallSyncInterval);
+      const updateGroupWallUI = () => {
+          if(!currentGroupData) return;
+          const wall = document.getElementById('grp-wall-list');
+          wall.innerHTML = currentGroupData.posts.length === 0 ? '<p style="color:#777;">No posts yet.</p>' : '';
+          currentGroupData.posts.forEach(p => {
+              const canDel = currentGroupData.myPerms && currentGroupData.myPerms.deletePosts;
+              wall.innerHTML += `<div style="border-bottom:1px solid #eee; padding:10px 0; position:relative;">
+                  ${canDel ? `<button class="btn btn-danger btn-sm" style="position:absolute; right:0; top:10px; padding:2px 6px;" onclick="deleteGroupPost('${p.id}')">X</button>` : ''}
+                  <div style="font-size:11px; color:#999; margin-bottom:5px;"><b>${p.authorName}</b> - ${new Date(p.timestamp).toLocaleString()}</div>
+                  <div>${p.text}</div>
+              </div>`;
+          });
+      };
+
+      const loadGroupDetail = async (groupId) => {
+          try {
+              if(grpWallSyncInterval) clearInterval(grpWallSyncInterval);
 
                 const group = await apiCall(`/groups/${groupId}`);
                 currentGroupData = group;
@@ -1745,6 +1750,7 @@
                 document.getElementById('prof-join-date').innerText = profile.joinDate ? new Date(profile.joinDate).toLocaleDateString() : 'Unknown';
                 document.getElementById('prof-coins').innerText = localStorage.getItem('sc_' + profile.id) || '0';
                 document.getElementById('prof-play-time').innerText = Math.floor((profile.totalPlayTimeMs || 0) / 60000) + 'm';
+                document.getElementById('prof-coins').innerText = localStorage.getItem('sc_' + profile.id) || '0';
                 document.querySelector('#view-profile .card').style.background = profile.profileThemeColor || '#ffffff';
 
                 const banner = document.getElementById('prof-primary-group-banner');

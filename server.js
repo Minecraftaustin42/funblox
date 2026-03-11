@@ -188,6 +188,7 @@ app.post('/api/signup', (req, res) => {
         inventory: [], bookmarks: [], equipped: null, primaryGroupId: null, coins: 0,
         statusMessage: '', profileThemeColor: '#ffffff', loginHistory: [],
         boosts: 0, bio: '', joinDate: new Date().toISOString(), totalPlayTimeMs: 0, gamePlayTime: {}, lastDailyRewardAt: 0, dailyStreak: 0
+        statusMessage: '', profileThemeColor: '#ffffff', loginHistory: []
     };
     newUser.loginHistory.unshift({ timestamp: Date.now(), device: sanitizeDevice(device) });
     db.users.push(newUser);
@@ -341,6 +342,8 @@ app.get('/api/me', requireAuth, (req, res) => {
     res.json({
         id: user.id, username: user.username, color: user.color, badges: user.badges, coins: user.coins, boosts: user.boosts || 0,
         statusMessage: user.statusMessage || '', profileThemeColor: user.profileThemeColor || '#ffffff', bio: user.bio || '', joinDate: user.joinDate,
+        id: user.id, username: user.username, color: user.color, badges: user.badges, coins: user.coins,
+        statusMessage: user.statusMessage || '', profileThemeColor: user.profileThemeColor || '#ffffff',
         requests, friends: friendsList, recentlyPlayed: recentGames, bookmarkedGames, 
         unreadMessages: (user.messages || []).length, equipped: user.equipped, myGroups, totalPlayTimeMs: user.totalPlayTimeMs || 0
     });
@@ -878,6 +881,7 @@ app.post('/api/games', requireAuth, (req, res) => {
         description: (description || '').toString().substring(0, 1000),
         thumbnail: (thumbnail || '').toString().substring(0, 1_400_000),
         createdAt: new Date().toISOString()
+        gameData, lastEditTime: Date.now(), collaborators: [], likes: [], plays: 0, updates: [], privateServers: [], createdAt: new Date().toISOString()
     };
     db.games.push(newGame);
     pushActivity({ type: 'game_published', userId: user.id, username: user.username, gameId: newGame.id, gameTitle: newGame.title });
@@ -958,6 +962,7 @@ app.get('/api/games/:id', (req, res) => {
     }
     const { privateServers, ...safeGame } = game;
     res.json({ ...safeGame, likesCount: game.likes.length, isLiked, isBookmarked, updates: game.updates || [], activeServers: { public: [] } });
+    res.json({ ...game, likesCount: game.likes.length, isLiked, isBookmarked, updates: game.updates || [], activeServers: { public: [] } });
 });
 
 app.post('/api/games/:id/updates', requireAuth, (req, res) => {
