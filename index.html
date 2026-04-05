@@ -130,6 +130,30 @@
         /* Toolbar */
         .toolbar { background: #fff; padding: 10px; border: 1px solid #d8dee2; border-radius: 4px; margin-bottom: 15px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
         .tool-btn { background: #ecf0f1; color: #333; border: 1px solid #bdc3c7; padding: 8px 15px; border-radius: 3px; cursor: pointer; font-weight: 600; }
+
+        /* BlockBlox visual coding editor */
+        .script-editor-mode-btn.active { box-shadow: inset 0 -2px 0 rgba(0,0,0,0.25); }
+        .blockblox-layout { display:flex; gap:12px; height:100%; min-height:280px; }
+        .blockblox-palette, .blockblox-workspace { background:#232323; border:1px solid #555; border-radius:6px; padding:10px; overflow:auto; }
+        .blockblox-palette { width:230px; flex-shrink:0; }
+        .blockblox-workspace { flex:1; }
+        .blockblox-chip { display:block; width:100%; margin-bottom:8px; border:0; border-radius:16px; padding:8px 10px; font-weight:700; color:#fff; cursor:pointer; text-align:left; }
+        .chip-event { background:#ff8c42; }
+        .chip-motion { background:#4f8df7; }
+        .chip-looks { background:#9b59b6; }
+        .chip-player { background:#2ecc71; }
+        .chip-ui { background:#e67e22; }
+        .chip-flow { background:#f1c40f; color:#222; }
+        .blockblox-row { background:#2f2f2f; border:1px solid #666; border-left:6px solid #4f8df7; border-radius:8px; padding:8px; margin-bottom:8px; color:#eee; display:flex; gap:8px; align-items:center; flex-wrap:wrap; cursor:grab; }
+        .blockblox-row[data-kind="event"] { border-left-color:#ff8c42; }
+        .blockblox-row[data-kind="motion"] { border-left-color:#4f8df7; }
+        .blockblox-row[data-kind="looks"] { border-left-color:#9b59b6; }
+        .blockblox-row[data-kind="player"] { border-left-color:#2ecc71; }
+        .blockblox-row[data-kind="ui"] { border-left-color:#e67e22; }
+        .blockblox-row[data-kind="flow"] { border-left-color:#f1c40f; }
+        .blockblox-row input, .blockblox-row select { background:#1f1f1f; color:#fff; border:1px solid #666; border-radius:4px; padding:4px 6px; }
+        .blockblox-delete { margin-left:auto; background:#e74c3c; border:0; color:#fff; border-radius:4px; padding:4px 8px; cursor:pointer; }
+        .blockblox-dropzone { min-height:120px; border:2px dashed #555; border-radius:6px; padding:8px; }
         .tool-btn.active { background: #3498db; color: white; border-color: #2980b9; }
         .active-users-badge { background-color: #2ecc71; color: white; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: bold; }
 
@@ -1174,14 +1198,37 @@
                     </div>
 
 <div id="script-editor-panel" style="display:none; position:absolute; top: 10px; left: 10px; right: 10px; bottom: 10px; background: rgba(30,30,30,0.95); padding: 15px; border-radius: 6px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); z-index: 200; flex-direction: column;">
-                        <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 10px; gap:10px; flex-wrap:wrap;">
                             <h3 style="margin:0; color:#fff;" id="script-editor-title">Edit Script</h3>
-                            <div>
+                            <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                                <button class="btn btn-sm btn-info script-editor-mode-btn" id="mode-text-btn" onclick="setScriptEditorMode('text')">Text Mode</button>
+                                <button class="btn btn-sm btn-warning script-editor-mode-btn" id="mode-block-btn" onclick="setScriptEditorMode('blocks')">BlockBlox Mode</button>
                                 <button class="btn btn-sm btn-success" onclick="saveScript()">Save Script</button>
                                 <button class="btn btn-sm btn-danger" onclick="document.getElementById('script-editor-panel').style.display='none'">Close</button>
                             </div>
                         </div>
-<textarea id="script-editor-textarea" style="flex-grow: 1; width: 100%; background: #1e1e1e; color: #d4d4d4; font-family: monospace; font-size: 14px; border: 1px solid #555; padding: 15px; resize: none; box-sizing: border-box;" placeholder="// Welcome to SculptCode! ??&#10;&#10;when tool clicked:&#10;    shoot '#ffff00' speed 2&#10;    // Give between 10 and 50 coins randomly!&#10;    leaderboard add 'Coins' random 10 50&#10;    data save 'Coins' as 'my_coins'&#10;end"></textarea>
+                        <div id="script-text-mode" style="display:flex; flex-grow:1; min-height:0;">
+                            <textarea id="script-editor-textarea" style="flex-grow: 1; width: 100%; background: #1e1e1e; color: #d4d4d4; font-family: monospace; font-size: 14px; border: 1px solid #555; padding: 15px; resize: none; box-sizing: border-box;" placeholder="on start:&#10;    ui message &quot;Hello Builder!&quot;&#10;end"></textarea>
+                        </div>
+                        <div id="script-block-mode" style="display:none; flex-grow:1; min-height:0;">
+                            <div class="blockblox-layout">
+                                <div class="blockblox-palette">
+                                    <h4 style="margin:0 0 8px 0; color:#fff;">BlockBlox</h4>
+                                    <button class="blockblox-chip chip-event" onclick="addBlockTemplate('event_start')">Event: on start</button>
+                                    <button class="blockblox-chip chip-motion" onclick="addBlockTemplate('move')">Motion: move object</button>
+                                    <button class="blockblox-chip chip-motion" onclick="addBlockTemplate('rotate')">Motion: rotate object</button>
+                                    <button class="blockblox-chip chip-looks" onclick="addBlockTemplate('color')">Looks: object color</button>
+                                    <button class="blockblox-chip chip-player" onclick="addBlockTemplate('player_heal')">Player: heal</button>
+                                    <button class="blockblox-chip chip-player" onclick="addBlockTemplate('player_damage')">Player: damage</button>
+                                    <button class="blockblox-chip chip-ui" onclick="addBlockTemplate('ui_message')">UI: message</button>
+                                    <button class="blockblox-chip chip-flow" onclick="addBlockTemplate('wait')">Flow: wait</button>
+                                    <p style="color:#aaa; font-size:12px; margin-top:10px;">Tip: drag blocks to reorder. Save compiles blocks into SculptScript for your 3D world object.</p>
+                                </div>
+                                <div class="blockblox-workspace">
+                                    <div id="blockblox-dropzone" class="blockblox-dropzone"></div>
+                                </div>
+                            </div>
+                        </div>
                         <input type="hidden" id="script-editor-target-id">
                     </div>
 
@@ -5015,6 +5062,149 @@ if(!edData.settings) edData.settings = { gravity: 0.35, skyColor: '#5b88a5', bri
             });
         };
 
+        let scriptEditorMode = 'text';
+        let blockbloxBlocks = [];
+        let dragBlockIndex = -1;
+
+        const createBlock = (type, values = {}) => {
+            const defaults = {
+                event_start: { kind: 'event', type: 'event_start', label: 'on start' },
+                move: { kind: 'motion', type: 'move', x: 1, y: 0, z: 0 },
+                rotate: { kind: 'motion', type: 'rotate', x: 0, y: 0.2, z: 0 },
+                color: { kind: 'looks', type: 'color', color: '#ffcc00' },
+                player_heal: { kind: 'player', type: 'player_heal', amount: 10 },
+                player_damage: { kind: 'player', type: 'player_damage', amount: 10 },
+                ui_message: { kind: 'ui', type: 'ui_message', text: 'Hello from BlockBlox!' },
+                wait: { kind: 'flow', type: 'wait', seconds: 1 }
+            };
+            return { ...defaults[type], ...values };
+        };
+
+        const renderBlockWorkspace = () => {
+            const zone = document.getElementById('blockblox-dropzone');
+            if (!zone) return;
+            zone.innerHTML = '';
+            if (blockbloxBlocks.length === 0) {
+                zone.innerHTML = '<p style="color:#aaa; margin:4px;">Drop blocks here to build behavior.</p>';
+            }
+            blockbloxBlocks.forEach((block, idx) => {
+                const row = document.createElement('div');
+                row.className = 'blockblox-row';
+                row.dataset.kind = block.kind || 'motion';
+                row.draggable = true;
+                row.addEventListener('dragstart', () => { dragBlockIndex = idx; });
+                row.addEventListener('dragover', (e) => e.preventDefault());
+                row.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    if (dragBlockIndex < 0 || dragBlockIndex === idx) return;
+                    const moved = blockbloxBlocks.splice(dragBlockIndex, 1)[0];
+                    blockbloxBlocks.splice(idx, 0, moved);
+                    dragBlockIndex = -1;
+                    renderBlockWorkspace();
+                });
+
+                if (block.type === 'event_start') row.innerHTML = `<strong>When game starts</strong>`;
+                if (block.type === 'move') row.innerHTML = `Move object x <input type="number" step="0.1" value="${block.x}"> y <input type="number" step="0.1" value="${block.y}"> z <input type="number" step="0.1" value="${block.z}">`;
+                if (block.type === 'rotate') row.innerHTML = `Rotate object x <input type="number" step="0.1" value="${block.x}"> y <input type="number" step="0.1" value="${block.y}"> z <input type="number" step="0.1" value="${block.z}">`;
+                if (block.type === 'color') row.innerHTML = `Set object color <input type="color" value="${block.color}">`;
+                if (block.type === 'player_heal') row.innerHTML = `Player heal <input type="number" step="1" value="${block.amount}">`;
+                if (block.type === 'player_damage') row.innerHTML = `Player damage <input type="number" step="1" value="${block.amount}">`;
+                if (block.type === 'ui_message') row.innerHTML = `Show message <input type="text" value="${(block.text || '').replace(/"/g, '&quot;')}">`;
+                if (block.type === 'wait') row.innerHTML = `Wait <input type="number" step="0.1" value="${block.seconds}"> seconds`;
+
+                const del = document.createElement('button');
+                del.className = 'blockblox-delete';
+                del.textContent = 'Delete';
+                del.onclick = () => { blockbloxBlocks.splice(idx, 1); renderBlockWorkspace(); };
+                row.appendChild(del);
+
+                const inputs = row.querySelectorAll('input');
+                inputs.forEach((input, inputIdx) => {
+                    input.addEventListener('input', (e) => {
+                        const v = e.target.type === 'number' ? parseFloat(e.target.value || '0') : e.target.value;
+                        if (block.type === 'move' || block.type === 'rotate') {
+                            const key = ['x','y','z'][inputIdx];
+                            block[key] = v;
+                        } else if (block.type === 'color') block.color = v;
+                        else if (block.type === 'player_heal' || block.type === 'player_damage') block.amount = v;
+                        else if (block.type === 'ui_message') block.text = v;
+                        else if (block.type === 'wait') block.seconds = v;
+                    });
+                });
+
+                zone.appendChild(row);
+            });
+        };
+
+        const addBlockTemplate = (type) => {
+            blockbloxBlocks.push(createBlock(type));
+            renderBlockWorkspace();
+        };
+
+        const setScriptEditorMode = (mode) => {
+            scriptEditorMode = mode;
+            document.getElementById('script-text-mode').style.display = mode === 'text' ? 'flex' : 'none';
+            document.getElementById('script-block-mode').style.display = mode === 'blocks' ? 'block' : 'none';
+            document.getElementById('mode-text-btn').classList.toggle('active', mode === 'text');
+            document.getElementById('mode-block-btn').classList.toggle('active', mode === 'blocks');
+            if (mode === 'blocks') {
+                loadBlocksFromScript(document.getElementById('script-editor-textarea').value || '');
+                renderBlockWorkspace();
+            }
+        };
+
+        const loadBlocksFromScript = (scriptText) => {
+            const lines = (scriptText || '').split('\n').map(l => l.trim()).filter(Boolean);
+            const parsed = [];
+            lines.forEach(line => {
+                if (line.startsWith('on start')) parsed.push(createBlock('event_start'));
+                else if (line.startsWith('object move')) {
+                    const p = line.split(/\s+/);
+                    parsed.push(createBlock('move', { x: parseFloat(p[2]) || 0, y: parseFloat(p[3]) || 0, z: parseFloat(p[4]) || 0 }));
+                } else if (line.startsWith('object rotate')) {
+                    const p = line.split(/\s+/);
+                    parsed.push(createBlock('rotate', { x: parseFloat(p[2]) || 0, y: parseFloat(p[3]) || 0, z: parseFloat(p[4]) || 0 }));
+                } else if (line.startsWith('object color')) {
+                    const p = line.split(/\s+/);
+                    parsed.push(createBlock('color', { color: p[2] || '#ffcc00' }));
+                } else if (line.startsWith('player heal')) {
+                    const p = line.split(/\s+/);
+                    parsed.push(createBlock('player_heal', { amount: parseFloat(p[2]) || 0 }));
+                } else if (line.startsWith('player damage')) {
+                    const p = line.split(/\s+/);
+                    parsed.push(createBlock('player_damage', { amount: parseFloat(p[2]) || 0 }));
+                } else if (line.startsWith('ui message')) {
+                    const msg = line.replace('ui message', '').trim().replace(/^"|"$/g, '');
+                    parsed.push(createBlock('ui_message', { text: msg }));
+                } else if (line.startsWith('wait')) {
+                    const p = line.split(/\s+/);
+                    parsed.push(createBlock('wait', { seconds: parseFloat(p[1]) || 1 }));
+                }
+            });
+            blockbloxBlocks = parsed.length ? parsed : [createBlock('event_start'), createBlock('ui_message')];
+        };
+
+        const compileBlocksToScript = () => {
+            const lines = [];
+            let hasEvent = false;
+            blockbloxBlocks.forEach((b) => {
+                if (b.type === 'event_start') { hasEvent = true; lines.push('on start:'); }
+                else if (b.type === 'move') lines.push(`    object move ${b.x || 0} ${b.y || 0} ${b.z || 0}`);
+                else if (b.type === 'rotate') lines.push(`    object rotate ${b.x || 0} ${b.y || 0} ${b.z || 0}`);
+                else if (b.type === 'color') lines.push(`    object color ${b.color || '#ffcc00'}`);
+                else if (b.type === 'player_heal') lines.push(`    player heal ${b.amount || 0}`);
+                else if (b.type === 'player_damage') lines.push(`    player damage ${b.amount || 0}`);
+                else if (b.type === 'ui_message') lines.push(`    ui message "${(b.text || '').replace(/"/g, '\"')}"`);
+                else if (b.type === 'wait') lines.push(`    wait ${b.seconds || 1}`);
+            });
+            if (!hasEvent) {
+                lines.unshift('on start:');
+                lines.push('    ui message "BlockBlox script started"');
+            }
+            lines.push('end');
+            return lines.join('\n');
+        };
+
         const openScriptEditor = (id) => {
             const obj = edData.objects.find(o => o.id === id);
             if (!obj) return;
@@ -5022,10 +5212,14 @@ if(!edData.settings) edData.settings = { gravity: 0.35, skyColor: '#5b88a5', bri
             document.getElementById('script-editor-target-id').value = id;
             document.getElementById('script-editor-textarea').value = obj.script || '';
             document.getElementById('script-editor-panel').style.display = 'flex';
+            setScriptEditorMode('blocks');
         };
 
         const saveScript = () => {
             const id = document.getElementById('script-editor-target-id').value;
+            if (scriptEditorMode === 'blocks') {
+                document.getElementById('script-editor-textarea').value = compileBlocksToScript();
+            }
             const scriptText = document.getElementById('script-editor-textarea').value;
             const obj = edData.objects.find(o => o.id === id);
             if (obj) {
