@@ -1287,6 +1287,7 @@
                                 <label style="font-size:12px;">Background</label>
                                 <input id="ui-item-bg" class="form-control mb-10" type="color" value="#2980b9" style="padding:0; height:34px;">
                                 <input id="ui-item-event" class="form-control mb-10" placeholder="Button function (ex: onButtonPressed)">
+                                <input id="ui-item-event" class="form-control mb-10" placeholder="Button event (ex: ui_button_press)">
                                 <button class="btn btn-sm btn-success" style="width:100%;" onclick="addUIElementFromDesigner()">Add UI Element</button>
                             </div>
                             <div style="flex:1; border:1px solid #555; border-radius:6px; padding:10px; background:#121212; display:flex; flex-direction:column; min-height:0;">
@@ -5231,6 +5232,10 @@ if(!edData.settings) edData.settings = { gravity: 0.35, skyColor: '#5b88a5', bri
             const value = type === 'bar' ? 100 : null;
 
             ensureUILayout().push({ id, type, text, x, y, w, h, color, bg, onClickFunction, value, visible: true });
+            const onClickEvent = document.getElementById('ui-item-event').value.trim();
+            const value = type === 'bar' ? 100 : null;
+
+            ensureUILayout().push({ id, type, text, x, y, w, h, color, bg, onClickEvent, value, visible: true });
             recordEdit();
             renderUIDesigner();
         };
@@ -5283,6 +5288,10 @@ if(!edData.settings) edData.settings = { gravity: 0.35, skyColor: '#5b88a5', bri
                         el.addEventListener('click', () => {
                             playMeshes.forEach(m => {
                                 if (m.userData && m.userData.sculptEngine) m.userData.sculptEngine.invokeHook(item.onClickFunction);
+                    if (item.type === 'button' && item.onClickEvent) {
+                        el.addEventListener('click', () => {
+                            playMeshes.forEach(m => {
+                                if (m.userData && m.userData.sculptEngine) m.userData.sculptEngine.triggerEvent(item.onClickEvent);
                             });
                         });
                     }
@@ -5310,6 +5319,7 @@ if(!edData.settings) edData.settings = { gravity: 0.35, skyColor: '#5b88a5', bri
                 const layout = ensureUILayout();
                 if (layout.some(i => i.id === id)) return;
                 layout.push({ id, type, text, x: parseFloat(x)||0, y: parseFloat(y)||0, w: parseFloat(w)||160, h: parseFloat(h)||34, color: '#fff', bg: '#34495e', onClickFunction: extra || '', value: 100, visible: true });
+                layout.push({ id, type, text, x: parseFloat(x)||0, y: parseFloat(y)||0, w: parseFloat(w)||160, h: parseFloat(h)||34, color: '#fff', bg: '#34495e', onClickEvent: extra || '', value: 100, visible: true });
                 this.build(layout);
             }
         };
@@ -5354,6 +5364,7 @@ if(!edData.settings) edData.settings = { gravity: 0.35, skyColor: '#5b88a5', bri
             ui_notify: { kind: 'ui', type: 'ui_notify', text: 'Checkpoint reached.' },
             ui_create_label: { kind: 'ui', type: 'ui_create_label', id: 'hud_label', text: 'Objective', x: 20, y: 20, w: 180, h: 32 },
             ui_create_button: { kind: 'ui', type: 'ui_create_button', id: 'hud_button', text: 'Press', x: 20, y: 60, w: 140, h: 34, functionName: 'onButtonPressed' },
+            ui_create_button: { kind: 'ui', type: 'ui_create_button', id: 'hud_button', text: 'Press', x: 20, y: 60, w: 140, h: 34, eventName: 'ui_button_press' },
             ui_create_bar: { kind: 'ui', type: 'ui_create_bar', id: 'hud_bar', x: 20, y: 100, w: 220, h: 20, value: 100 },
             ui_set_text: { kind: 'ui', type: 'ui_set_text', id: 'hud_label', text: 'Updated!' },
             ui_set_value: { kind: 'ui', type: 'ui_set_value', id: 'hud_bar', value: 75 },
@@ -5395,6 +5406,7 @@ if(!edData.settings) edData.settings = { gravity: 0.35, skyColor: '#5b88a5', bri
             if (block.type === 'ui_notify') return `ui notify <input type="text" data-key="text" value="${(block.text || '').replace(/"/g, '&quot;')}">`;
             if (block.type === 'ui_create_label') return `ui create label <input type="text" data-key="id" value="${block.id}"> "<input type="text" data-key="text" value="${(block.text || '').replace(/"/g, '&quot;')}">" x <input type="number" data-key="x" value="${block.x}"> y <input type="number" data-key="y" value="${block.y}"> w <input type="number" data-key="w" value="${block.w}"> h <input type="number" data-key="h" value="${block.h}">`;
             if (block.type === 'ui_create_button') return `ui create button <input type="text" data-key="id" value="${block.id}"> "<input type="text" data-key="text" value="${(block.text || '').replace(/"/g, '&quot;')}">" x <input type="number" data-key="x" value="${block.x}"> y <input type="number" data-key="y" value="${block.y}"> w <input type="number" data-key="w" value="${block.w}"> h <input type="number" data-key="h" value="${block.h}"> function <input type="text" data-key="functionName" value="${(block.functionName || '').replace(/"/g, '&quot;')}">`;
+            if (block.type === 'ui_create_button') return `ui create button <input type="text" data-key="id" value="${block.id}"> "<input type="text" data-key="text" value="${(block.text || '').replace(/"/g, '&quot;')}">" x <input type="number" data-key="x" value="${block.x}"> y <input type="number" data-key="y" value="${block.y}"> w <input type="number" data-key="w" value="${block.w}"> h <input type="number" data-key="h" value="${block.h}"> event <input type="text" data-key="eventName" value="${(block.eventName || '').replace(/"/g, '&quot;')}">`;
             if (block.type === 'ui_create_bar') return `ui create bar <input type="text" data-key="id" value="${block.id}"> x <input type="number" data-key="x" value="${block.x}"> y <input type="number" data-key="y" value="${block.y}"> w <input type="number" data-key="w" value="${block.w}"> h <input type="number" data-key="h" value="${block.h}"> value <input type="number" data-key="value" value="${block.value}">`;
             if (block.type === 'ui_set_text') return `ui settext <input type="text" data-key="id" value="${block.id}"> "<input type="text" data-key="text" value="${(block.text || '').replace(/"/g, '&quot;')}">"`;
             if (block.type === 'ui_set_value') return `ui setvalue <input type="text" data-key="id" value="${block.id}"> <input type="number" data-key="value" value="${block.value}">`;
@@ -5434,6 +5446,7 @@ if(!edData.settings) edData.settings = { gravity: 0.35, skyColor: '#5b88a5', bri
             if (block.type === 'ui_notify') return `ui notify "${(block.text || '').replace(/"/g, '\\"')}"`;
             if (block.type === 'ui_create_label') return `ui create label ${block.id || 'hud_label'} "${(block.text || '').replace(/"/g, '\\"')}" ${block.x || 0} ${block.y || 0} ${block.w || 180} ${block.h || 32}`;
             if (block.type === 'ui_create_button') return `ui create button ${block.id || 'hud_button'} "${(block.text || '').replace(/"/g, '\\"')}" ${block.x || 0} ${block.y || 0} ${block.w || 140} ${block.h || 34} ${block.functionName || 'onButtonPressed'}`;
+            if (block.type === 'ui_create_button') return `ui create button ${block.id || 'hud_button'} "${(block.text || '').replace(/"/g, '\\"')}" ${block.x || 0} ${block.y || 0} ${block.w || 140} ${block.h || 34} ${block.eventName || 'ui_button_press'}`;
             if (block.type === 'ui_create_bar') return `ui create bar ${block.id || 'hud_bar'} ${block.x || 0} ${block.y || 0} ${block.w || 220} ${block.h || 20} ${block.value || 100}`;
             if (block.type === 'ui_set_text') return `ui settext ${block.id || 'hud_label'} "${(block.text || '').replace(/"/g, '\\"')}"`;
             if (block.type === 'ui_set_value') return `ui setvalue ${block.id || 'hud_bar'} ${block.value || 0}`;
@@ -5509,6 +5522,11 @@ if(!edData.settings) edData.settings = { gravity: 0.35, skyColor: '#5b88a5', bri
                 row.appendChild(del);
 
                 row.querySelectorAll('input, select').forEach((input) => {
+                del.onclick = () => { sculptscriptBlocks.splice(idx, 1); renderSculptScriptWorkspace(); };
+                row.appendChild(del);
+
+                row.querySelectorAll('input, select').forEach((input) => {
+                row.querySelectorAll('input').forEach((input) => {
                     input.addEventListener('input', (e) => {
                         const key = e.target.dataset.key;
                         const isNumber = e.target.type === 'number';
@@ -5529,6 +5547,7 @@ if(!edData.settings) edData.settings = { gravity: 0.35, skyColor: '#5b88a5', bri
             recordEdit();
         };
         window.addSculptScriptBlock = addSculptScriptBlock;
+        };
 
         const loadSculptScriptBlocks = (scriptText) => {
             const blocks = [];
@@ -5560,6 +5579,7 @@ if(!edData.settings) edData.settings = { gravity: 0.35, skyColor: '#5b88a5', bri
                 else if (lower.startsWith('ui create button')) {
                     const m = line.match(/^ui create button\s+(\S+)\s+"([^"]*)"\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+(\S+)/i);
                     if (m) blocks.push(createSculptScriptBlock('ui_create_button', { id: m[1], text: m[2], x: parseFloat(m[3]), y: parseFloat(m[4]), w: parseFloat(m[5]), h: parseFloat(m[6]), functionName: m[7] }));
+                    if (m) blocks.push(createSculptScriptBlock('ui_create_button', { id: m[1], text: m[2], x: parseFloat(m[3]), y: parseFloat(m[4]), w: parseFloat(m[5]), h: parseFloat(m[6]), eventName: m[7] }));
                     else blocks.push(createSculptScriptBlock('custom', { command: line }));
                 }
                 else if (lower.startsWith('ui create bar')) {
