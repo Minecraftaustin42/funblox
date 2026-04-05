@@ -130,6 +130,30 @@
         /* Toolbar */
         .toolbar { background: #fff; padding: 10px; border: 1px solid #d8dee2; border-radius: 4px; margin-bottom: 15px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
         .tool-btn { background: #ecf0f1; color: #333; border: 1px solid #bdc3c7; padding: 8px 15px; border-radius: 3px; cursor: pointer; font-weight: 600; }
+
+        /* SculptScript visual coding editor */
+        .script-editor-mode-btn.active { box-shadow: inset 0 -2px 0 rgba(0,0,0,0.25); }
+        .sculptscript-layout { display:flex; gap:12px; height:100%; min-height:280px; }
+        .sculptscript-palette, .sculptscript-workspace { background:#232323; border:1px solid #555; border-radius:6px; padding:10px; overflow:auto; }
+        .sculptscript-palette { width:230px; flex-shrink:0; }
+        .sculptscript-workspace { flex:1; }
+        .sculptscript-chip { display:block; width:100%; margin-bottom:8px; border:0; border-radius:16px; padding:8px 10px; font-weight:700; color:#fff; cursor:pointer; text-align:left; }
+        .chip-event { background:#ff8c42; }
+        .chip-motion { background:#4f8df7; }
+        .chip-looks { background:#9b59b6; }
+        .chip-player { background:#2ecc71; }
+        .chip-ui { background:#e67e22; }
+        .chip-flow { background:#f1c40f; color:#222; }
+        .sculptscript-row { background:#2f2f2f; border:1px solid #666; border-left:6px solid #4f8df7; border-radius:8px; padding:8px; margin-bottom:8px; color:#eee; display:flex; gap:8px; align-items:center; flex-wrap:wrap; cursor:grab; }
+        .sculptscript-row[data-kind="event"] { border-left-color:#ff8c42; }
+        .sculptscript-row[data-kind="motion"] { border-left-color:#4f8df7; }
+        .sculptscript-row[data-kind="looks"] { border-left-color:#9b59b6; }
+        .sculptscript-row[data-kind="player"] { border-left-color:#2ecc71; }
+        .sculptscript-row[data-kind="ui"] { border-left-color:#e67e22; }
+        .sculptscript-row[data-kind="flow"] { border-left-color:#f1c40f; }
+        .sculptscript-row input, .sculptscript-row select { background:#1f1f1f; color:#fff; border:1px solid #666; border-radius:4px; padding:4px 6px; }
+        .sculptscript-delete { margin-left:auto; background:#e74c3c; border:0; color:#fff; border-radius:4px; padding:4px 8px; cursor:pointer; }
+        .sculptscript-dropzone { min-height:120px; border:2px dashed #555; border-radius:6px; padding:8px; }
         .tool-btn.active { background: #3498db; color: white; border-color: #2980b9; }
         .active-users-badge { background-color: #2ecc71; color: white; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: bold; }
 
@@ -1174,14 +1198,50 @@
                     </div>
 
 <div id="script-editor-panel" style="display:none; position:absolute; top: 10px; left: 10px; right: 10px; bottom: 10px; background: rgba(30,30,30,0.95); padding: 15px; border-radius: 6px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); z-index: 200; flex-direction: column;">
-                        <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 10px; gap:10px; flex-wrap:wrap;">
                             <h3 style="margin:0; color:#fff;" id="script-editor-title">Edit Script</h3>
-                            <div>
+                            <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
                                 <button class="btn btn-sm btn-success" onclick="saveScript()">Save Script</button>
                                 <button class="btn btn-sm btn-danger" onclick="document.getElementById('script-editor-panel').style.display='none'">Close</button>
                             </div>
                         </div>
-<textarea id="script-editor-textarea" style="flex-grow: 1; width: 100%; background: #1e1e1e; color: #d4d4d4; font-family: monospace; font-size: 14px; border: 1px solid #555; padding: 15px; resize: none; box-sizing: border-box;" placeholder="// Welcome to SculptCode! ??&#10;&#10;when tool clicked:&#10;    shoot '#ffff00' speed 2&#10;    // Give between 10 and 50 coins randomly!&#10;    leaderboard add 'Coins' random 10 50&#10;    data save 'Coins' as 'my_coins'&#10;end"></textarea>
+                        <div id="script-block-mode" style="display:block; flex-grow:1; min-height:0;">
+                            <div class="sculptscript-layout">
+                                <div class="sculptscript-palette">
+                                    <h4 style="margin:0 0 8px 0; color:#fff;">SculptScript Blocks</h4>
+                                    <button class="sculptscript-chip chip-event" onclick="addSculptScriptBlock('event')">Event Trigger</button>
+                                    <button class="sculptscript-chip chip-flow" onclick="addSculptScriptBlock('repeat')">Repeat Loop</button>
+                                    <button class="sculptscript-chip chip-flow" onclick="addSculptScriptBlock('while')">While Loop</button>
+                                    <button class="sculptscript-chip chip-flow" onclick="addSculptScriptBlock('if')">If Condition</button>
+                                    <button class="sculptscript-chip chip-flow" onclick="addSculptScriptBlock('end')">End Block</button>
+                                    <button class="sculptscript-chip chip-flow" onclick="addSculptScriptBlock('wait')">Wait</button>
+                                    <button class="sculptscript-chip chip-motion" onclick="addSculptScriptBlock('move')">Object Move</button>
+                                    <button class="sculptscript-chip chip-motion" onclick="addSculptScriptBlock('rotate')">Object Rotate</button>
+                                    <button class="sculptscript-chip chip-looks" onclick="addSculptScriptBlock('color')">Object Color</button>
+                                    <button class="sculptscript-chip chip-player" onclick="addSculptScriptBlock('player_health')">Set Player Health</button>
+                                    <button class="sculptscript-chip chip-player" onclick="addSculptScriptBlock('player_heal')">Player Heal</button>
+                                    <button class="sculptscript-chip chip-player" onclick="addSculptScriptBlock('player_damage')">Player Damage</button>
+                                    <button class="sculptscript-chip chip-player" onclick="addSculptScriptBlock('player_speed')">Set Player Speed</button>
+                                    <button class="sculptscript-chip chip-player" onclick="addSculptScriptBlock('player_jump')">Set Player Jump</button>
+                                    <button class="sculptscript-chip chip-player" onclick="addSculptScriptBlock('player_teleport')">Player Teleport</button>
+                                    <button class="sculptscript-chip chip-ui" onclick="addSculptScriptBlock('ui_message')">UI Message</button>
+                                    <button class="sculptscript-chip chip-ui" onclick="addSculptScriptBlock('ui_notify')">UI Notify</button>
+                                    <button class="sculptscript-chip chip-motion" onclick="addSculptScriptBlock('vehicle_speed')">Vehicle Speed</button>
+                                    <button class="sculptscript-chip chip-motion" onclick="addSculptScriptBlock('vehicle_turn')">Vehicle Turn</button>
+                                    <button class="sculptscript-chip chip-flow" onclick="addSculptScriptBlock('set_var')">Set Variable</button>
+                                    <button class="sculptscript-chip chip-flow" onclick="addSculptScriptBlock('function')">Function</button>
+                                    <button class="sculptscript-chip chip-flow" onclick="addSculptScriptBlock('call')">Call Function</button>
+                                    <button class="sculptscript-chip chip-ui" onclick="addSculptScriptBlock('custom')">Custom Command</button>
+                                </div>
+                                <div class="sculptscript-workspace">
+                                    <div id="sculptscript-dropzone" class="sculptscript-dropzone"></div>
+                                    <div style="margin-top:10px;">
+                                        <label style="display:block; color:#bbb; font-size:12px; margin-bottom:4px;">Generated SculptScript Preview</label>
+                                        <textarea id="sculptscript-preview" readonly style="width:100%; min-height:130px; background:#171717; color:#ddd; border:1px solid #555; border-radius:4px; padding:8px; font-family:monospace; font-size:12px;"></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                         <input type="hidden" id="script-editor-target-id">
                     </div>
 
@@ -5015,18 +5075,209 @@ if(!edData.settings) edData.settings = { gravity: 0.35, skyColor: '#5b88a5', bri
             });
         };
 
+        let sculptscriptBlocks = [];
+        let dragBlockIndex = -1;
+
+        const sculptDefaults = {
+            event: { kind: 'event', type: 'event', eventName: 'start' },
+            repeat: { kind: 'flow', type: 'repeat', count: 5 },
+            while: { kind: 'flow', type: 'while', condition: 'health > 0' },
+            if: { kind: 'flow', type: 'if', condition: 'score > 10' },
+            end: { kind: 'flow', type: 'end' },
+            wait: { kind: 'flow', type: 'wait', seconds: 1 },
+            move: { kind: 'motion', type: 'move', x: 1, y: 0, z: 0 },
+            rotate: { kind: 'motion', type: 'rotate', x: 0, y: 0.2, z: 0 },
+            color: { kind: 'looks', type: 'color', color: '#ffcc00' },
+            player_health: { kind: 'player', type: 'player_health', amount: 100 },
+            player_heal: { kind: 'player', type: 'player_heal', amount: 10 },
+            player_damage: { kind: 'player', type: 'player_damage', amount: 10 },
+            player_speed: { kind: 'player', type: 'player_speed', amount: 0.15 },
+            player_jump: { kind: 'player', type: 'player_jump', amount: 0.5 },
+            player_teleport: { kind: 'player', type: 'player_teleport', x: 0, y: 5, z: 0 },
+            ui_message: { kind: 'ui', type: 'ui_message', text: 'Mission Started!' },
+            ui_notify: { kind: 'ui', type: 'ui_notify', text: 'Checkpoint reached.' },
+            vehicle_speed: { kind: 'motion', type: 'vehicle_speed', amount: 1 },
+            vehicle_turn: { kind: 'motion', type: 'vehicle_turn', amount: 0.04 },
+            set_var: { kind: 'flow', type: 'set_var', name: 'score', value: '10' },
+            function: { kind: 'flow', type: 'function', name: 'fire_blaster' },
+            call: { kind: 'flow', type: 'call', name: 'fire_blaster' },
+            custom: { kind: 'ui', type: 'custom', command: 'object move 0 1 0' }
+        };
+
+        const createSculptScriptBlock = (type, values = {}) => ({ ...(sculptDefaults[type] || { kind: 'ui', type: 'custom', command: '' }), ...values });
+
+        const blockRowLabel = (block) => {
+            if (block.type === 'event') return `on <input type="text" data-key="eventName" value="${block.eventName || 'start'}"> :`;
+            if (block.type === 'repeat') return `repeat <input type="number" step="1" data-key="count" value="${block.count}"> :`;
+            if (block.type === 'while') return `while <input type="text" data-key="condition" value="${(block.condition || '').replace(/"/g, '&quot;')}"> :`;
+            if (block.type === 'if') return `if <input type="text" data-key="condition" value="${(block.condition || '').replace(/"/g, '&quot;')}"> :`;
+            if (block.type === 'end') return `<strong>end</strong>`;
+            if (block.type === 'wait') return `wait <input type="number" step="0.1" data-key="seconds" value="${block.seconds}">`;
+            if (block.type === 'move') return `object move <input type="number" step="0.1" data-key="x" value="${block.x}"> <input type="number" step="0.1" data-key="y" value="${block.y}"> <input type="number" step="0.1" data-key="z" value="${block.z}">`;
+            if (block.type === 'rotate') return `object rotate <input type="number" step="0.1" data-key="x" value="${block.x}"> <input type="number" step="0.1" data-key="y" value="${block.y}"> <input type="number" step="0.1" data-key="z" value="${block.z}">`;
+            if (block.type === 'color') return `object color <input type="color" data-key="color" value="${block.color}">`;
+            if (block.type === 'player_health') return `player health <input type="number" step="1" data-key="amount" value="${block.amount}">`;
+            if (block.type === 'player_heal') return `player heal <input type="number" step="1" data-key="amount" value="${block.amount}">`;
+            if (block.type === 'player_damage') return `player damage <input type="number" step="1" data-key="amount" value="${block.amount}">`;
+            if (block.type === 'player_speed') return `player speed <input type="number" step="0.01" data-key="amount" value="${block.amount}">`;
+            if (block.type === 'player_jump') return `player jump <input type="number" step="0.01" data-key="amount" value="${block.amount}">`;
+            if (block.type === 'player_teleport') return `player teleport <input type="number" step="0.1" data-key="x" value="${block.x}"> <input type="number" step="0.1" data-key="y" value="${block.y}"> <input type="number" step="0.1" data-key="z" value="${block.z}">`;
+            if (block.type === 'ui_message') return `ui message <input type="text" data-key="text" value="${(block.text || '').replace(/"/g, '&quot;')}">`;
+            if (block.type === 'ui_notify') return `ui notify <input type="text" data-key="text" value="${(block.text || '').replace(/"/g, '&quot;')}">`;
+            if (block.type === 'vehicle_speed') return `vehicle speed <input type="number" step="0.1" data-key="amount" value="${block.amount}">`;
+            if (block.type === 'vehicle_turn') return `vehicle turn <input type="number" step="0.01" data-key="amount" value="${block.amount}">`;
+            if (block.type === 'set_var') return `set <input type="text" data-key="name" value="${(block.name || '').replace(/"/g, '&quot;')}"> = <input type="text" data-key="value" value="${(block.value || '').replace(/"/g, '&quot;')}">`;
+            if (block.type === 'function') return `function <input type="text" data-key="name" value="${(block.name || '').replace(/"/g, '&quot;')}"> :`;
+            if (block.type === 'call') return `call <input type="text" data-key="name" value="${(block.name || '').replace(/"/g, '&quot;')}">`;
+            return `custom <input type="text" data-key="command" value="${(block.command || '').replace(/"/g, '&quot;')}">`;
+        };
+
+        const lineForBlock = (block) => {
+            if (block.type === 'event') return `on ${block.eventName || 'start'}:`;
+            if (block.type === 'repeat') return `repeat ${block.count || 1}:`;
+            if (block.type === 'while') return `while ${block.condition || '1 == 1'}:`;
+            if (block.type === 'if') return `if ${block.condition || '1 == 1'}:`;
+            if (block.type === 'end') return 'end';
+            if (block.type === 'wait') return `wait ${block.seconds || 1}`;
+            if (block.type === 'move') return `object move ${block.x || 0} ${block.y || 0} ${block.z || 0}`;
+            if (block.type === 'rotate') return `object rotate ${block.x || 0} ${block.y || 0} ${block.z || 0}`;
+            if (block.type === 'color') return `object color ${block.color || '#ffcc00'}`;
+            if (block.type === 'player_health') return `player health ${block.amount || 100}`;
+            if (block.type === 'player_heal') return `player heal ${block.amount || 10}`;
+            if (block.type === 'player_damage') return `player damage ${block.amount || 10}`;
+            if (block.type === 'player_speed') return `player speed ${block.amount || 0.15}`;
+            if (block.type === 'player_jump') return `player jump ${block.amount || 0.5}`;
+            if (block.type === 'player_teleport') return `player teleport ${block.x || 0} ${block.y || 0} ${block.z || 0}`;
+            if (block.type === 'ui_message') return `ui message "${(block.text || '').replace(/"/g, '\\"')}"`;
+            if (block.type === 'ui_notify') return `ui notify "${(block.text || '').replace(/"/g, '\\"')}"`;
+            if (block.type === 'vehicle_speed') return `vehicle speed ${block.amount || 1}`;
+            if (block.type === 'vehicle_turn') return `vehicle turn ${block.amount || 0.04}`;
+            if (block.type === 'set_var') return `set ${block.name || 'score'} = ${block.value || '0'}`;
+            if (block.type === 'function') return `function ${block.name || 'my_fn'}:`;
+            if (block.type === 'call') return `call ${block.name || 'my_fn'}`;
+            return block.command || '';
+        };
+
+        const compileSculptScriptBlocks = () => {
+            const lines = [];
+            let openDepth = 0;
+            let hasEvent = false;
+            sculptscriptBlocks.forEach((block) => {
+                const line = lineForBlock(block);
+                if (!line) return;
+                const isEnd = block.type === 'end';
+                if (isEnd) openDepth = Math.max(0, openDepth - 1);
+                lines.push(`${'    '.repeat(openDepth)}${line}`);
+                if (block.type === 'event' || block.type === 'repeat' || block.type === 'while' || block.type === 'if' || block.type === 'function') {
+                    openDepth++;
+                }
+                if (block.type === 'event') hasEvent = true;
+            });
+            if (!hasEvent) {
+                lines.unshift('on start:');
+                openDepth++;
+            }
+            while (openDepth > 0) {
+                openDepth--;
+                lines.push(`${'    '.repeat(openDepth)}end`);
+            }
+            return lines.join('\n');
+        };
+
+        const renderSculptScriptWorkspace = () => {
+            const zone = document.getElementById('sculptscript-dropzone');
+            if (!zone) return;
+            zone.innerHTML = '';
+            if (sculptscriptBlocks.length === 0) zone.innerHTML = '<p style="color:#aaa; margin:4px;">Add blocks from the left to build your game logic.</p>';
+
+            sculptscriptBlocks.forEach((block, idx) => {
+                const row = document.createElement('div');
+                row.className = 'sculptscript-row';
+                row.dataset.kind = block.kind || 'flow';
+                row.draggable = true;
+                row.addEventListener('dragstart', () => { dragBlockIndex = idx; });
+                row.addEventListener('dragover', (e) => e.preventDefault());
+                row.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    if (dragBlockIndex < 0 || dragBlockIndex === idx) return;
+                    const moved = sculptscriptBlocks.splice(dragBlockIndex, 1)[0];
+                    sculptscriptBlocks.splice(idx, 0, moved);
+                    dragBlockIndex = -1;
+                    renderSculptScriptWorkspace();
+                });
+
+                row.innerHTML = blockRowLabel(block);
+                const del = document.createElement('button');
+                del.className = 'sculptscript-delete';
+                del.textContent = 'Delete';
+                del.onclick = () => { sculptscriptBlocks.splice(idx, 1); renderSculptScriptWorkspace(); };
+                row.appendChild(del);
+
+                row.querySelectorAll('input').forEach((input) => {
+                    input.addEventListener('input', (e) => {
+                        const key = e.target.dataset.key;
+                        const isNumber = e.target.type === 'number';
+                        block[key] = isNumber ? parseFloat(e.target.value || '0') : e.target.value;
+                        document.getElementById('sculptscript-preview').value = compileSculptScriptBlocks();
+                    });
+                });
+
+                zone.appendChild(row);
+            });
+            document.getElementById('sculptscript-preview').value = compileSculptScriptBlocks();
+        };
+
+        const addSculptScriptBlock = (type) => {
+            sculptscriptBlocks.push(createSculptScriptBlock(type));
+            renderSculptScriptWorkspace();
+        };
+
+        const loadSculptScriptBlocks = (scriptText) => {
+            const blocks = [];
+            (scriptText || '').split('\n').map(l => l.trim()).filter(Boolean).forEach((line) => {
+                const lower = line.toLowerCase();
+                if (lower.startsWith('on ')) blocks.push(createSculptScriptBlock('event', { eventName: line.replace(/^on\s+/i, '').replace(':', '') }));
+                else if (lower.startsWith('repeat ')) blocks.push(createSculptScriptBlock('repeat', { count: parseFloat(line.split(/\s+/)[1]) || 1 }));
+                else if (lower.startsWith('while ')) blocks.push(createSculptScriptBlock('while', { condition: line.replace(/^while\s+/i, '').replace(':', '') }));
+                else if (lower.startsWith('if ')) blocks.push(createSculptScriptBlock('if', { condition: line.replace(/^if\s+/i, '').replace(':', '') }));
+                else if (lower.startsWith('function ')) blocks.push(createSculptScriptBlock('function', { name: line.replace(/^function\s+/i, '').replace(':', '') }));
+                else if (lower === 'end') blocks.push(createSculptScriptBlock('end'));
+                else if (lower.startsWith('wait ')) blocks.push(createSculptScriptBlock('wait', { seconds: parseFloat(line.split(/\s+/)[1]) || 1 }));
+                else if (lower.startsWith('object move')) { const p = line.split(/\s+/); blocks.push(createSculptScriptBlock('move', { x: parseFloat(p[2]) || 0, y: parseFloat(p[3]) || 0, z: parseFloat(p[4]) || 0 })); }
+                else if (lower.startsWith('object rotate')) { const p = line.split(/\s+/); blocks.push(createSculptScriptBlock('rotate', { x: parseFloat(p[2]) || 0, y: parseFloat(p[3]) || 0, z: parseFloat(p[4]) || 0 })); }
+                else if (lower.startsWith('object color')) blocks.push(createSculptScriptBlock('color', { color: line.split(/\s+/)[2] || '#ffcc00' }));
+                else if (lower.startsWith('player health')) blocks.push(createSculptScriptBlock('player_health', { amount: parseFloat(line.split(/\s+/)[2]) || 100 }));
+                else if (lower.startsWith('player heal')) blocks.push(createSculptScriptBlock('player_heal', { amount: parseFloat(line.split(/\s+/)[2]) || 10 }));
+                else if (lower.startsWith('player damage')) blocks.push(createSculptScriptBlock('player_damage', { amount: parseFloat(line.split(/\s+/)[2]) || 10 }));
+                else if (lower.startsWith('player speed')) blocks.push(createSculptScriptBlock('player_speed', { amount: parseFloat(line.split(/\s+/)[2]) || 0.15 }));
+                else if (lower.startsWith('player jump')) blocks.push(createSculptScriptBlock('player_jump', { amount: parseFloat(line.split(/\s+/)[2]) || 0.5 }));
+                else if (lower.startsWith('player teleport')) { const p = line.split(/\s+/); blocks.push(createSculptScriptBlock('player_teleport', { x: parseFloat(p[2]) || 0, y: parseFloat(p[3]) || 0, z: parseFloat(p[4]) || 0 })); }
+                else if (lower.startsWith('ui message')) blocks.push(createSculptScriptBlock('ui_message', { text: line.replace(/^ui message\s+/i, '').replace(/^"|"$/g, '') }));
+                else if (lower.startsWith('ui notify')) blocks.push(createSculptScriptBlock('ui_notify', { text: line.replace(/^ui notify\s+/i, '').replace(/^"|"$/g, '') }));
+                else if (lower.startsWith('vehicle speed')) blocks.push(createSculptScriptBlock('vehicle_speed', { amount: parseFloat(line.split(/\s+/)[2]) || 1 }));
+                else if (lower.startsWith('vehicle turn')) blocks.push(createSculptScriptBlock('vehicle_turn', { amount: parseFloat(line.split(/\s+/)[2]) || 0.04 }));
+                else if (lower.startsWith('set ')) {
+                    const eq = line.indexOf('=');
+                    blocks.push(createSculptScriptBlock('set_var', { name: line.slice(4, eq).trim(), value: line.slice(eq + 1).trim() }));
+                } else if (lower.startsWith('call ')) blocks.push(createSculptScriptBlock('call', { name: line.replace(/^call\s+/i, '') }));
+                else blocks.push(createSculptScriptBlock('custom', { command: line }));
+            });
+            sculptscriptBlocks = blocks.length ? blocks : [createSculptScriptBlock('event'), createSculptScriptBlock('ui_message'), createSculptScriptBlock('end')];
+            renderSculptScriptWorkspace();
+        };
+
         const openScriptEditor = (id) => {
             const obj = edData.objects.find(o => o.id === id);
             if (!obj) return;
             document.getElementById('script-editor-title').innerText = `Script: ${obj.name}`;
             document.getElementById('script-editor-target-id').value = id;
-            document.getElementById('script-editor-textarea').value = obj.script || '';
             document.getElementById('script-editor-panel').style.display = 'flex';
+            loadSculptScriptBlocks(obj.script || '');
         };
 
         const saveScript = () => {
             const id = document.getElementById('script-editor-target-id').value;
-            const scriptText = document.getElementById('script-editor-textarea').value;
+            const scriptText = compileSculptScriptBlocks();
             const obj = edData.objects.find(o => o.id === id);
             if (obj) {
                 obj.script = scriptText;
