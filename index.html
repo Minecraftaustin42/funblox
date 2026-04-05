@@ -1201,6 +1201,7 @@
                         <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 10px; gap:10px; flex-wrap:wrap;">
                             <h3 style="margin:0; color:#fff;" id="script-editor-title">Edit Script</h3>
                             <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                                <button class="btn btn-sm btn-info" onclick="toggleUIDesigner()">UI Designer</button>
                                 <button class="btn btn-sm btn-success" onclick="saveScript()">Save Script</button>
                                 <button class="btn btn-sm btn-danger" onclick="document.getElementById('script-editor-panel').style.display='none'">Close</button>
                             </div>
@@ -1226,6 +1227,12 @@
                                     <button class="sculptscript-chip chip-player" onclick="addSculptScriptBlock('player_teleport')">Player Teleport</button>
                                     <button class="sculptscript-chip chip-ui" onclick="addSculptScriptBlock('ui_message')">UI Message</button>
                                     <button class="sculptscript-chip chip-ui" onclick="addSculptScriptBlock('ui_notify')">UI Notify</button>
+                                    <button class="sculptscript-chip chip-ui" onclick="addSculptScriptBlock('ui_create_label')">UI Create Label</button>
+                                    <button class="sculptscript-chip chip-ui" onclick="addSculptScriptBlock('ui_create_button')">UI Create Button</button>
+                                    <button class="sculptscript-chip chip-ui" onclick="addSculptScriptBlock('ui_create_bar')">UI Create Bar</button>
+                                    <button class="sculptscript-chip chip-ui" onclick="addSculptScriptBlock('ui_set_text')">UI Set Text</button>
+                                    <button class="sculptscript-chip chip-ui" onclick="addSculptScriptBlock('ui_set_value')">UI Set Value</button>
+                                    <button class="sculptscript-chip chip-ui" onclick="addSculptScriptBlock('ui_visible')">UI Show/Hide</button>
                                     <button class="sculptscript-chip chip-motion" onclick="addSculptScriptBlock('vehicle_speed')">Vehicle Speed</button>
                                     <button class="sculptscript-chip chip-motion" onclick="addSculptScriptBlock('vehicle_turn')">Vehicle Turn</button>
                                     <button class="sculptscript-chip chip-flow" onclick="addSculptScriptBlock('set_var')">Set Variable</button>
@@ -1243,6 +1250,43 @@
                             </div>
                         </div>
                         <input type="hidden" id="script-editor-target-id">
+                    </div>
+
+                    <div id="ui-designer-panel" style="display:none; position:absolute; top: 20px; left: 20px; right: 20px; bottom: 20px; background: rgba(18,18,18,0.97); border:1px solid #555; border-radius:8px; z-index:240; padding:12px; color:#fff;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px;">
+                            <h3 style="margin:0;">Visual UI Designer</h3>
+                            <button class="btn btn-sm btn-danger" onclick="toggleUIDesigner(false)">Close</button>
+                        </div>
+                        <div style="display:flex; gap:12px; height:calc(100% - 42px);">
+                            <div style="width:270px; border:1px solid #555; border-radius:6px; padding:10px; overflow:auto; background:#1f1f1f;">
+                                <label style="font-size:12px;">Type</label>
+                                <select id="ui-item-type" class="form-control" style="margin-bottom:8px;">
+                                    <option value="label">Label</option>
+                                    <option value="button">Button</option>
+                                    <option value="bar">Progress Bar</option>
+                                </select>
+                                <input id="ui-item-id" class="form-control mb-10" placeholder="Element ID (hudScore)">
+                                <input id="ui-item-text" class="form-control mb-10" placeholder="Text / Title">
+                                <div style="display:flex; gap:6px; margin-bottom:8px;">
+                                    <input id="ui-item-x" class="form-control" type="number" placeholder="X" value="20">
+                                    <input id="ui-item-y" class="form-control" type="number" placeholder="Y" value="20">
+                                </div>
+                                <div style="display:flex; gap:6px; margin-bottom:8px;">
+                                    <input id="ui-item-width" class="form-control" type="number" placeholder="W" value="180">
+                                    <input id="ui-item-height" class="form-control" type="number" placeholder="H" value="36">
+                                </div>
+                                <label style="font-size:12px;">Text Color</label>
+                                <input id="ui-item-color" class="form-control mb-10" type="color" value="#ffffff" style="padding:0; height:34px;">
+                                <label style="font-size:12px;">Background</label>
+                                <input id="ui-item-bg" class="form-control mb-10" type="color" value="#2980b9" style="padding:0; height:34px;">
+                                <input id="ui-item-event" class="form-control mb-10" placeholder="Button event (ex: ui_button_press)">
+                                <button class="btn btn-sm btn-success" style="width:100%;" onclick="addUIElementFromDesigner()">Add UI Element</button>
+                            </div>
+                            <div style="flex:1; border:1px solid #555; border-radius:6px; padding:10px; background:#121212; display:flex; flex-direction:column; min-height:0;">
+                                <div id="ui-designer-canvas" style="position:relative; flex:1; border:1px dashed #666; border-radius:4px; background:#0f172a; overflow:hidden;"></div>
+                                <div id="ui-designer-list" style="margin-top:10px; max-height:160px; overflow:auto; border-top:1px solid #333; padding-top:8px;"></div>
+                            </div>
+                        </div>
                     </div>
 
 
@@ -1350,6 +1394,15 @@
                     
                     <div class="canvas-container">
                         <div id="play-container-3d" tabindex="0"></div>
+                        <div id="runtime-ui-layer" style="position:absolute; inset:0; z-index:55; pointer-events:none;"></div>
+                        <div id="player-health-hud" style="position:absolute; left:15px; bottom:15px; z-index:66; background:rgba(0,0,0,0.55); color:#fff; border-radius:8px; padding:8px 10px; min-width:170px; pointer-events:none;">
+                            <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;">
+                                <strong>Health</strong><span id="player-health-label">100 / 100</span>
+                            </div>
+                            <div style="height:10px; background:#2c3e50; border-radius:99px; overflow:hidden;">
+                                <div id="player-health-fill" style="height:100%; width:100%; background:linear-gradient(90deg,#2ecc71,#f1c40f,#e74c3c);"></div>
+                            </div>
+                        </div>
                         <div id="nametags-container"></div>
 
                         <div id="game-chat-ui" style="position:absolute; top:15px; left:15px; width:320px; max-width:calc(100% - 30px); z-index:65; pointer-events:auto;">
@@ -4404,9 +4457,9 @@ const playRandomGame = async () => {
                 }
                 // PLAYER API
                 else if (category === 'player') {
-                    if (action === 'health') { this.ctx.player.health = val; printOutput(`Player Health set to ${val}`); }
-                    if (action === 'heal') { this.ctx.player.health += val; printOutput(`Player Healed +${val}. Health is ${this.ctx.player.health}`); }
-                    if (action === 'damage') { this.ctx.player.health -= val; printOutput(`Player Damaged -${val}. Health is ${this.ctx.player.health}`); }
+                    if (action === 'health') { this.ctx.player.health = Math.max(0, Math.min(100, val)); printOutput(`Player Health set to ${this.ctx.player.health}`); }
+                    if (action === 'heal') { this.ctx.player.health = Math.max(0, Math.min(100, this.ctx.player.health + val)); printOutput(`Player Healed +${val}. Health is ${this.ctx.player.health}`); }
+                    if (action === 'damage') { this.ctx.player.health = Math.max(0, Math.min(100, this.ctx.player.health - val)); printOutput(`Player Damaged -${val}. Health is ${this.ctx.player.health}`); }
                     if (action === 'speed') { this.ctx.player.speed = val; }
                     if (action === 'jump') { this.ctx.player.jump = val; }
                     if (action === 'teleport') {
@@ -4419,6 +4472,16 @@ const playRandomGame = async () => {
                 else if (category === 'ui') {
                     if (action === 'message') showModal('Message', val);
                     if (action === 'notify') printOutput(`[Notification]: ${val}`, 'warn');
+                    if (action === 'settext' && this.ctx.ui) this.ctx.ui.setText(parts[2], this.evaluate(parts.slice(3).join(' ')).toString().replace(/^"|"$/g, ''));
+                    if (action === 'setvalue' && this.ctx.ui) this.ctx.ui.setValue(parts[2], this.evaluate(parts[3]));
+                    if (action === 'visible' && this.ctx.ui) this.ctx.ui.setVisible(parts[2], parseFloat(this.evaluate(parts[3])) > 0);
+                    if (action === 'create' && this.ctx.ui) {
+                        const uiType = (parts[2] || '').toLowerCase();
+                        if (uiType === 'label') this.ctx.ui.create('label', parts[3], this.evaluate(parts[4]), this.evaluate(parts[5]), this.evaluate(parts[6]), this.evaluate(parts[7]), this.evaluate(parts[8]));
+                        if (uiType === 'button') this.ctx.ui.create('button', parts[3], this.evaluate(parts[4]), this.evaluate(parts[5]), this.evaluate(parts[6]), this.evaluate(parts[7]), this.evaluate(parts[8]), this.evaluate(parts[9]));
+                        if (uiType === 'bar') this.ctx.ui.create('bar', parts[3], '', this.evaluate(parts[4]), this.evaluate(parts[5]), this.evaluate(parts[6]), this.evaluate(parts[7]));
+                        if (uiType === 'bar') this.ctx.ui.setValue(parts[3], this.evaluate(parts[8] || 100));
+                    }
                 }
                 // VEHICLE API
                 else if (category === 'vehicle' && this.ctx.mesh.userData.type === 'vehicle') {
@@ -4446,6 +4509,7 @@ let edData = {
             settings: { gravity: 0.35, skyColor: '#5b88a5', brightness: 0.65 }, // FIX: Sculpt City Defaults!
             spawn: {x:0, y:2, z:0, scale:{x:4, y:1, z:4}}, 
             objects: [{ id: crypto.randomUUID(), name: 'Baseplate', type: 'block', position: { x: 0, y: -2, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, scale: { x: 100, y: 4, z: 100 }, color: '#55aa55', material: 'Grass' }], 
+            uiLayout: [],
             genre: 'Sandbox' 
         };
         let currentEditGameId = null; 
@@ -5096,6 +5160,12 @@ if(!edData.settings) edData.settings = { gravity: 0.35, skyColor: '#5b88a5', bri
             player_teleport: { kind: 'player', type: 'player_teleport', x: 0, y: 5, z: 0 },
             ui_message: { kind: 'ui', type: 'ui_message', text: 'Mission Started!' },
             ui_notify: { kind: 'ui', type: 'ui_notify', text: 'Checkpoint reached.' },
+            ui_create_label: { kind: 'ui', type: 'ui_create_label', id: 'hud_label', text: 'Objective', x: 20, y: 20, w: 180, h: 32 },
+            ui_create_button: { kind: 'ui', type: 'ui_create_button', id: 'hud_button', text: 'Press', x: 20, y: 60, w: 140, h: 34, eventName: 'ui_button_press' },
+            ui_create_bar: { kind: 'ui', type: 'ui_create_bar', id: 'hud_bar', x: 20, y: 100, w: 220, h: 20, value: 100 },
+            ui_set_text: { kind: 'ui', type: 'ui_set_text', id: 'hud_label', text: 'Updated!' },
+            ui_set_value: { kind: 'ui', type: 'ui_set_value', id: 'hud_bar', value: 75 },
+            ui_visible: { kind: 'ui', type: 'ui_visible', id: 'hud_label', visible: 1 },
             vehicle_speed: { kind: 'motion', type: 'vehicle_speed', amount: 1 },
             vehicle_turn: { kind: 'motion', type: 'vehicle_turn', amount: 0.04 },
             set_var: { kind: 'flow', type: 'set_var', name: 'score', value: '10' },
@@ -5124,6 +5194,12 @@ if(!edData.settings) edData.settings = { gravity: 0.35, skyColor: '#5b88a5', bri
             if (block.type === 'player_teleport') return `player teleport <input type="number" step="0.1" data-key="x" value="${block.x}"> <input type="number" step="0.1" data-key="y" value="${block.y}"> <input type="number" step="0.1" data-key="z" value="${block.z}">`;
             if (block.type === 'ui_message') return `ui message <input type="text" data-key="text" value="${(block.text || '').replace(/"/g, '&quot;')}">`;
             if (block.type === 'ui_notify') return `ui notify <input type="text" data-key="text" value="${(block.text || '').replace(/"/g, '&quot;')}">`;
+            if (block.type === 'ui_create_label') return `ui create label <input type="text" data-key="id" value="${block.id}"> "<input type="text" data-key="text" value="${(block.text || '').replace(/"/g, '&quot;')}">" x <input type="number" data-key="x" value="${block.x}"> y <input type="number" data-key="y" value="${block.y}"> w <input type="number" data-key="w" value="${block.w}"> h <input type="number" data-key="h" value="${block.h}">`;
+            if (block.type === 'ui_create_button') return `ui create button <input type="text" data-key="id" value="${block.id}"> "<input type="text" data-key="text" value="${(block.text || '').replace(/"/g, '&quot;')}">" x <input type="number" data-key="x" value="${block.x}"> y <input type="number" data-key="y" value="${block.y}"> w <input type="number" data-key="w" value="${block.w}"> h <input type="number" data-key="h" value="${block.h}"> event <input type="text" data-key="eventName" value="${(block.eventName || '').replace(/"/g, '&quot;')}">`;
+            if (block.type === 'ui_create_bar') return `ui create bar <input type="text" data-key="id" value="${block.id}"> x <input type="number" data-key="x" value="${block.x}"> y <input type="number" data-key="y" value="${block.y}"> w <input type="number" data-key="w" value="${block.w}"> h <input type="number" data-key="h" value="${block.h}"> value <input type="number" data-key="value" value="${block.value}">`;
+            if (block.type === 'ui_set_text') return `ui settext <input type="text" data-key="id" value="${block.id}"> "<input type="text" data-key="text" value="${(block.text || '').replace(/"/g, '&quot;')}">"`;
+            if (block.type === 'ui_set_value') return `ui setvalue <input type="text" data-key="id" value="${block.id}"> <input type="number" data-key="value" value="${block.value}">`;
+            if (block.type === 'ui_visible') return `ui visible <input type="text" data-key="id" value="${block.id}"> <select data-key="visible"><option value="1" ${String(block.visible) === '1' ? 'selected' : ''}>show</option><option value="0" ${String(block.visible) === '0' ? 'selected' : ''}>hide</option></select>`;
             if (block.type === 'vehicle_speed') return `vehicle speed <input type="number" step="0.1" data-key="amount" value="${block.amount}">`;
             if (block.type === 'vehicle_turn') return `vehicle turn <input type="number" step="0.01" data-key="amount" value="${block.amount}">`;
             if (block.type === 'set_var') return `set <input type="text" data-key="name" value="${(block.name || '').replace(/"/g, '&quot;')}"> = <input type="text" data-key="value" value="${(block.value || '').replace(/"/g, '&quot;')}">`;
@@ -5150,6 +5226,12 @@ if(!edData.settings) edData.settings = { gravity: 0.35, skyColor: '#5b88a5', bri
             if (block.type === 'player_teleport') return `player teleport ${block.x || 0} ${block.y || 0} ${block.z || 0}`;
             if (block.type === 'ui_message') return `ui message "${(block.text || '').replace(/"/g, '\\"')}"`;
             if (block.type === 'ui_notify') return `ui notify "${(block.text || '').replace(/"/g, '\\"')}"`;
+            if (block.type === 'ui_create_label') return `ui create label ${block.id || 'hud_label'} "${(block.text || '').replace(/"/g, '\\"')}" ${block.x || 0} ${block.y || 0} ${block.w || 180} ${block.h || 32}`;
+            if (block.type === 'ui_create_button') return `ui create button ${block.id || 'hud_button'} "${(block.text || '').replace(/"/g, '\\"')}" ${block.x || 0} ${block.y || 0} ${block.w || 140} ${block.h || 34} ${block.eventName || 'ui_button_press'}`;
+            if (block.type === 'ui_create_bar') return `ui create bar ${block.id || 'hud_bar'} ${block.x || 0} ${block.y || 0} ${block.w || 220} ${block.h || 20} ${block.value || 100}`;
+            if (block.type === 'ui_set_text') return `ui settext ${block.id || 'hud_label'} "${(block.text || '').replace(/"/g, '\\"')}"`;
+            if (block.type === 'ui_set_value') return `ui setvalue ${block.id || 'hud_bar'} ${block.value || 0}`;
+            if (block.type === 'ui_visible') return `ui visible ${block.id || 'hud_label'} ${parseFloat(block.visible) > 0 ? 1 : 0}`;
             if (block.type === 'vehicle_speed') return `vehicle speed ${block.amount || 1}`;
             if (block.type === 'vehicle_turn') return `vehicle turn ${block.amount || 0.04}`;
             if (block.type === 'set_var') return `set ${block.name || 'score'} = ${block.value || '0'}`;
@@ -5213,6 +5295,7 @@ if(!edData.settings) edData.settings = { gravity: 0.35, skyColor: '#5b88a5', bri
                 del.onclick = () => { sculptscriptBlocks.splice(idx, 1); renderSculptScriptWorkspace(); };
                 row.appendChild(del);
 
+                row.querySelectorAll('input, select').forEach((input) => {
                 row.querySelectorAll('input').forEach((input) => {
                     input.addEventListener('input', (e) => {
                         const key = e.target.dataset.key;
@@ -5254,6 +5337,32 @@ if(!edData.settings) edData.settings = { gravity: 0.35, skyColor: '#5b88a5', bri
                 else if (lower.startsWith('player teleport')) { const p = line.split(/\s+/); blocks.push(createSculptScriptBlock('player_teleport', { x: parseFloat(p[2]) || 0, y: parseFloat(p[3]) || 0, z: parseFloat(p[4]) || 0 })); }
                 else if (lower.startsWith('ui message')) blocks.push(createSculptScriptBlock('ui_message', { text: line.replace(/^ui message\s+/i, '').replace(/^"|"$/g, '') }));
                 else if (lower.startsWith('ui notify')) blocks.push(createSculptScriptBlock('ui_notify', { text: line.replace(/^ui notify\s+/i, '').replace(/^"|"$/g, '') }));
+                else if (lower.startsWith('ui create label')) {
+                    const m = line.match(/^ui create label\s+(\S+)\s+"([^"]*)"\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)/i);
+                    if (m) blocks.push(createSculptScriptBlock('ui_create_label', { id: m[1], text: m[2], x: parseFloat(m[3]), y: parseFloat(m[4]), w: parseFloat(m[5]), h: parseFloat(m[6]) }));
+                    else blocks.push(createSculptScriptBlock('custom', { command: line }));
+                }
+                else if (lower.startsWith('ui create button')) {
+                    const m = line.match(/^ui create button\s+(\S+)\s+"([^"]*)"\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+(\S+)/i);
+                    if (m) blocks.push(createSculptScriptBlock('ui_create_button', { id: m[1], text: m[2], x: parseFloat(m[3]), y: parseFloat(m[4]), w: parseFloat(m[5]), h: parseFloat(m[6]), eventName: m[7] }));
+                    else blocks.push(createSculptScriptBlock('custom', { command: line }));
+                }
+                else if (lower.startsWith('ui create bar')) {
+                    const p = line.split(/\s+/);
+                    blocks.push(createSculptScriptBlock('ui_create_bar', { id: p[3] || 'hud_bar', x: parseFloat(p[4]) || 0, y: parseFloat(p[5]) || 0, w: parseFloat(p[6]) || 220, h: parseFloat(p[7]) || 20, value: parseFloat(p[8]) || 100 }));
+                }
+                else if (lower.startsWith('ui settext')) {
+                    const m = line.match(/^ui settext\s+(\S+)\s+"([^"]*)"/i);
+                    blocks.push(createSculptScriptBlock('ui_set_text', { id: m ? m[1] : 'hud_label', text: m ? m[2] : '' }));
+                }
+                else if (lower.startsWith('ui setvalue')) {
+                    const p = line.split(/\s+/);
+                    blocks.push(createSculptScriptBlock('ui_set_value', { id: p[2] || 'hud_bar', value: parseFloat(p[3]) || 0 }));
+                }
+                else if (lower.startsWith('ui visible')) {
+                    const p = line.split(/\s+/);
+                    blocks.push(createSculptScriptBlock('ui_visible', { id: p[2] || 'hud_label', visible: parseFloat(p[3]) || 0 }));
+                }
                 else if (lower.startsWith('vehicle speed')) blocks.push(createSculptScriptBlock('vehicle_speed', { amount: parseFloat(line.split(/\s+/)[2]) || 1 }));
                 else if (lower.startsWith('vehicle turn')) blocks.push(createSculptScriptBlock('vehicle_turn', { amount: parseFloat(line.split(/\s+/)[2]) || 0.04 }));
                 else if (lower.startsWith('set ')) {
@@ -5327,7 +5436,7 @@ const promptClearEditor = () => {
         // --- Editor Core Engine ---
      const clearEditor = () => {
             currentEditGameId = null; 
-            edData = { settings: { gravity: 0.35, skyColor: '#5b88a5', brightness: 0.65 }, spawn: {x:0, y:2, z:0, scale:{x:4, y:1, z:4}}, objects: [{ id: crypto.randomUUID(), name: 'Baseplate', type: 'block', position: { x: 0, y: -2, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, scale: { x: 100, y: 4, z: 100 }, color: '#55aa55', material: 'Grass' }] };
+            edData = { settings: { gravity: 0.35, skyColor: '#5b88a5', brightness: 0.65 }, spawn: {x:0, y:2, z:0, scale:{x:4, y:1, z:4}}, objects: [{ id: crypto.randomUUID(), name: 'Baseplate', type: 'block', position: { x: 0, y: -2, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, scale: { x: 100, y: 4, z: 100 }, color: '#55aa55', material: 'Grass' }], uiLayout: [] };
             historyStack = []; historyIndex = -1;
             buildEditorScene(); recordEdit(true);
         };
@@ -5904,12 +6013,15 @@ window.playControls.mouseButtons = { LEFT: THREE.MOUSE.NONE, MIDDLE: THREE.MOUSE
             playerObj.vx = 0; playerObj.vy = 0; playerObj.vz = 0; playerObj.rotY = 0;
             playerObj.speed = 0.2;
 playerObj.jump = 0.6;
+            playerObj.health = 100;
             playerObj.sitting = false;
             playerObj.vehicleSeat = null;
             playerObj.seatCooldown = 0;
             if (document.getElementById('play-speedometer')) document.getElementById('play-speedometer').style.display = 'none';
             
             buildPlayScene();
+            uiRuntimeManager.build(activeLevel.uiLayout || []);
+            updatePlayerHealthHUD();
 
 playCamera.position.set(playerObj.x, playerObj.y + 8, playerObj.z + 12);
 
@@ -5989,7 +6101,7 @@ else if (cData.type === 'aircraftSeat') geo = new THREE.BoxGeometry(1, 0.5, 1);
                     });
 
                if (objData.script && objData.script.trim() !== '') {
-                        const engine = new SculptScript(objData.script, { mesh: mesh, player: playerObj });
+                        const engine = new SculptScript(objData.script, { mesh: mesh, player: playerObj, ui: uiRuntimeManager });
                         engine.parse();
                         mesh.userData.sculptEngine = engine;
                         // Fire 'on start' event immediately!
@@ -6018,7 +6130,7 @@ else if (cData.type === 'aircraftSeat') geo = new THREE.BoxGeometry(1, 0.5, 1);
 mesh.userData = { id: objData.id, compiledScript: null, isTool: objData.type === 'tool', isEquipped: false, type: objData.type, noCollide: objData.noCollide || false };
                     
             if (objData.script && objData.script.trim() !== '') {
-                        const engine = new SculptScript(objData.script, { mesh: mesh, player: playerObj });
+                        const engine = new SculptScript(objData.script, { mesh: mesh, player: playerObj, ui: uiRuntimeManager });
                         engine.parse();
                         mesh.userData.sculptEngine = engine;
                         // Fire 'on start' event immediately!
@@ -6672,9 +6784,11 @@ const updateChatBubbles = () => {
                             playerObj.x -= playerObj.vx; playerObj.z -= playerObj.vz; 
                         } 
                         else { 
+                            const impact = -playerObj.vy;
                             playerObj.y = exactHeight + 0.001; 
                             playerObj.grounded = true; // PROVEN GROUNDED
                             playerObj.vy = 0; 
+                            if (impact > 2.8) damagePlayer((impact - 2.8) * 10);
                             if (slopeDiff > 0.1) { playerObj.vx *= 0.6; playerObj.vz *= 0.6; } 
                         }
                     }
@@ -6685,9 +6799,11 @@ const updateChatBubbles = () => {
             let hit = checkCollision(playerObj.x, playerObj.y, playerObj.z);
             if (hit) { 
                 if (playerObj.vy < 0) { 
+                    const impact = -playerObj.vy;
                     playerObj.y = hit.max.y + 0.001; 
                     playerObj.grounded = true; // PROVEN GROUNDED
                     playerObj.vy = 0; 
+                    if (impact > 3.2) damagePlayer((impact - 3.2) * 8);
                 } else if (playerObj.vy > 0) { 
                     playerObj.y = hit.min.y - 5 - 0.001; // Hit head on ceiling
                     playerObj.vy = 0; 
@@ -6777,6 +6893,7 @@ const animatePlay = () => {
                     if (window.playLadders) { window.playLadders = playMeshes.filter(m => m.userData.type === 'ladder').map(m => { m.updateMatrixWorld(true); return new THREE.Box3().setFromObject(m); }); }
                 }
                 updatePhysics3D();
+                updatePlayerHealthHUD();
 
 if (playerMesh) {
                     if (!playerObj.sitting) {
