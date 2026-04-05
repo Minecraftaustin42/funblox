@@ -5208,6 +5208,8 @@ if(!edData.settings) edData.settings = { gravity: 0.35, skyColor: '#5b88a5', bri
                 box.style.fontSize = '12px';
                 box.style.padding = '2px 6px';
                 box.style.boxSizing = 'border-box';
+                const previewBarVal = (item.value === undefined || item.value === null) ? 100 : item.value;
+                box.innerText = item.type === 'bar' ? `${item.id}: ${previewBarVal}%` : (item.text || item.id);
                 box.innerText = item.type === 'bar' ? `${item.id}: ${item.value ?? 100}%` : (item.text || item.id);
                 canvas.appendChild(box);
 
@@ -5277,6 +5279,8 @@ if(!edData.settings) edData.settings = { gravity: 0.35, skyColor: '#5b88a5', bri
                     if (item.type === 'bar') {
                         const fill = document.createElement('div');
                         fill.style.height = '100%';
+                        const fillVal = (item.value === undefined || item.value === null) ? 100 : item.value;
+                        fill.style.width = `${fillVal}%`;
                         fill.style.width = `${item.value ?? 100}%`;
                         fill.style.background = '#2ecc71';
                         fill.style.borderRadius = '7px';
@@ -5756,7 +5760,8 @@ mesh.userData = {
             if (edData.spawn) {
                 const spMesh = new THREE.Mesh(new THREE.BoxGeometry(1, 0.1, 1), new THREE.MeshLambertMaterial({ color: '#f1c40f', transparent: true, opacity: 0.8 }));
                 spMesh.position.set(edData.spawn.x, edData.spawn.y, edData.spawn.z);
-                spMesh.scale.set(edData.spawn.scale?.x || 4, edData.spawn.scale?.y || 1, edData.spawn.scale?.z || 4);
+                const spawnScale = edData.spawn.scale || {};
+                spMesh.scale.set(spawnScale.x || 4, spawnScale.y || 1, spawnScale.z || 4);
                 spMesh.userData = { isSpawn: true };
                 edScene.add(spMesh); editorMeshes.push(spMesh);
             }
@@ -5900,6 +5905,10 @@ mesh.userData = {
                     edScene.add(ghost);
                     collabMeshes[key] = ghost;
                 }
+                const cx = c.cursor && typeof c.cursor.x === 'number' ? c.cursor.x : 0;
+                const cy = c.cursor && typeof c.cursor.y === 'number' ? c.cursor.y : 0;
+                const cz = c.cursor && typeof c.cursor.z === 'number' ? c.cursor.z : 0;
+                collabMeshes[key].position.set(cx, cy + 1.2, cz);
                 collabMeshes[key].position.set(c.cursor?.x || 0, (c.cursor?.y || 0) + 1.2, c.cursor?.z || 0);
             });
             Object.keys(collabMeshes).forEach(key => {
