@@ -1233,6 +1233,13 @@
                                     <button class="sculptscript-chip chip-ui" onclick="addSculptScriptBlock('ui_set_text')">UI Set Text</button>
                                     <button class="sculptscript-chip chip-ui" onclick="addSculptScriptBlock('ui_set_value')">UI Set Value</button>
                                     <button class="sculptscript-chip chip-ui" onclick="addSculptScriptBlock('ui_visible')">UI Show/Hide</button>
+                                    <button class="sculptscript-chip chip-motion" onclick="addSculptScriptBlock('blaster_damage')">Blaster Damage</button>
+                                    <button class="sculptscript-chip chip-motion" onclick="addSculptScriptBlock('blaster_speed')">Blaster Speed</button>
+                                    <button class="sculptscript-chip chip-motion" onclick="addSculptScriptBlock('blaster_spread')">Blaster Spread</button>
+                                    <button class="sculptscript-chip chip-motion" onclick="addSculptScriptBlock('blaster_fire_rate')">Blaster Fire Rate</button>
+                                    <button class="sculptscript-chip chip-motion" onclick="addSculptScriptBlock('blaster_lifetime')">Blaster Lifetime</button>
+                                    <button class="sculptscript-chip chip-motion" onclick="addSculptScriptBlock('blaster_color')">Blaster Color</button>
+                                    <button class="sculptscript-chip chip-motion" onclick="addSculptScriptBlock('blaster_shoot')">Blaster Shoot</button>
                                     <button class="sculptscript-chip chip-motion" onclick="addSculptScriptBlock('vehicle_speed')">Vehicle Speed</button>
                                     <button class="sculptscript-chip chip-motion" onclick="addSculptScriptBlock('vehicle_turn')">Vehicle Turn</button>
                                     <button class="sculptscript-chip chip-flow" onclick="addSculptScriptBlock('set_var')">Set Variable</button>
@@ -1279,6 +1286,7 @@
                                 <input id="ui-item-color" class="form-control mb-10" type="color" value="#ffffff" style="padding:0; height:34px;">
                                 <label style="font-size:12px;">Background</label>
                                 <input id="ui-item-bg" class="form-control mb-10" type="color" value="#2980b9" style="padding:0; height:34px;">
+                                <input id="ui-item-event" class="form-control mb-10" placeholder="Button function (ex: onButtonPressed)">
                                 <input id="ui-item-event" class="form-control mb-10" placeholder="Button event (ex: ui_button_press)">
                                 <button class="btn btn-sm btn-success" style="width:100%;" onclick="addUIElementFromDesigner()">Add UI Element</button>
                             </div>
@@ -4430,6 +4438,12 @@ const playRandomGame = async () => {
                 if (eventNode) await this.executeBlock(eventNode.body);
             }
 
+            async invokeHook(name) {
+                const fn = this.functions[name];
+                if (fn) return this.executeBlock(fn.body);
+                return this.triggerEvent(name);
+            }
+
             // --- 4. GAME API MOCK BINDINGS ---
             async executeAPI(parts) {
                 const category = parts[0].toLowerCase();
@@ -4467,6 +4481,7 @@ const playRandomGame = async () => {
                         this.ctx.player.y = this.evaluate(parts[3]);
                         this.ctx.player.z = this.evaluate(parts[4]);
                     }
+                    if (typeof updatePlayerHealthHUD === 'function') updatePlayerHealthHUD();
                 }
                 // UI API
                 else if (category === 'ui') {
@@ -4481,6 +4496,22 @@ const playRandomGame = async () => {
                         if (uiType === 'button') this.ctx.ui.create('button', parts[3], this.evaluate(parts[4]), this.evaluate(parts[5]), this.evaluate(parts[6]), this.evaluate(parts[7]), this.evaluate(parts[8]), this.evaluate(parts[9]));
                         if (uiType === 'bar') this.ctx.ui.create('bar', parts[3], '', this.evaluate(parts[4]), this.evaluate(parts[5]), this.evaluate(parts[6]), this.evaluate(parts[7]));
                         if (uiType === 'bar') this.ctx.ui.setValue(parts[3], this.evaluate(parts[8] || 100));
+                    }
+                }
+                else if (category === 'blaster') {
+                    if (action === 'damage') this.ctx.player.blasterDamage = parseFloat(val) || 20;
+                    if (action === 'speed') this.ctx.player.blasterSpeed = parseFloat(val) || 2.5;
+                    if (action === 'spread') this.ctx.player.blasterSpread = parseFloat(val) || 0;
+                    if (action === 'firerate') this.ctx.player.blasterFireRate = parseFloat(val) || 150;
+                    if (action === 'lifetime') this.ctx.player.blasterLifetime = parseFloat(val) || 100;
+                    if (action === 'color') this.ctx.player.blasterColor = val || '#ffff00';
+                    if (action === 'shoot' && this.ctx.shoot) {
+                        this.ctx.shoot(this.ctx.player.blasterColor || '#ffff00', this.ctx.player.blasterSpeed || 2.5, {
+                            damage: this.ctx.player.blasterDamage || 20,
+                            spread: this.ctx.player.blasterSpread || 0,
+                            lifetime: this.ctx.player.blasterLifetime || 100,
+                            fireRate: this.ctx.player.blasterFireRate || 150
+                        });
                     }
                 }
                 // VEHICLE API
@@ -5197,6 +5228,10 @@ if(!edData.settings) edData.settings = { gravity: 0.35, skyColor: '#5b88a5', bri
             const h = parseFloat(document.getElementById('ui-item-height').value || '34');
             const color = document.getElementById('ui-item-color').value;
             const bg = document.getElementById('ui-item-bg').value;
+            const onClickFunction = document.getElementById('ui-item-event').value.trim();
+            const value = type === 'bar' ? 100 : null;
+
+            ensureUILayout().push({ id, type, text, x, y, w, h, color, bg, onClickFunction, value, visible: true });
             const onClickEvent = document.getElementById('ui-item-event').value.trim();
             const value = type === 'bar' ? 100 : null;
 
@@ -5249,6 +5284,10 @@ if(!edData.settings) edData.settings = { gravity: 0.35, skyColor: '#5b88a5', bri
                     } else {
                         el.textContent = item.text || item.id;
                     }
+                    if (item.type === 'button' && item.onClickFunction) {
+                        el.addEventListener('click', () => {
+                            playMeshes.forEach(m => {
+                                if (m.userData && m.userData.sculptEngine) m.userData.sculptEngine.invokeHook(item.onClickFunction);
                     if (item.type === 'button' && item.onClickEvent) {
                         el.addEventListener('click', () => {
                             playMeshes.forEach(m => {
@@ -5279,6 +5318,7 @@ if(!edData.settings) edData.settings = { gravity: 0.35, skyColor: '#5b88a5', bri
             create(type, id, text, x, y, w = 160, h = 34, extra = '') {
                 const layout = ensureUILayout();
                 if (layout.some(i => i.id === id)) return;
+                layout.push({ id, type, text, x: parseFloat(x)||0, y: parseFloat(y)||0, w: parseFloat(w)||160, h: parseFloat(h)||34, color: '#fff', bg: '#34495e', onClickFunction: extra || '', value: 100, visible: true });
                 layout.push({ id, type, text, x: parseFloat(x)||0, y: parseFloat(y)||0, w: parseFloat(w)||160, h: parseFloat(h)||34, color: '#fff', bg: '#34495e', onClickEvent: extra || '', value: 100, visible: true });
                 this.build(layout);
             }
@@ -5323,11 +5363,19 @@ if(!edData.settings) edData.settings = { gravity: 0.35, skyColor: '#5b88a5', bri
             ui_message: { kind: 'ui', type: 'ui_message', text: 'Mission Started!' },
             ui_notify: { kind: 'ui', type: 'ui_notify', text: 'Checkpoint reached.' },
             ui_create_label: { kind: 'ui', type: 'ui_create_label', id: 'hud_label', text: 'Objective', x: 20, y: 20, w: 180, h: 32 },
+            ui_create_button: { kind: 'ui', type: 'ui_create_button', id: 'hud_button', text: 'Press', x: 20, y: 60, w: 140, h: 34, functionName: 'onButtonPressed' },
             ui_create_button: { kind: 'ui', type: 'ui_create_button', id: 'hud_button', text: 'Press', x: 20, y: 60, w: 140, h: 34, eventName: 'ui_button_press' },
             ui_create_bar: { kind: 'ui', type: 'ui_create_bar', id: 'hud_bar', x: 20, y: 100, w: 220, h: 20, value: 100 },
             ui_set_text: { kind: 'ui', type: 'ui_set_text', id: 'hud_label', text: 'Updated!' },
             ui_set_value: { kind: 'ui', type: 'ui_set_value', id: 'hud_bar', value: 75 },
             ui_visible: { kind: 'ui', type: 'ui_visible', id: 'hud_label', visible: 1 },
+            blaster_damage: { kind: 'motion', type: 'blaster_damage', amount: 20 },
+            blaster_speed: { kind: 'motion', type: 'blaster_speed', amount: 2.5 },
+            blaster_spread: { kind: 'motion', type: 'blaster_spread', amount: 0.05 },
+            blaster_fire_rate: { kind: 'motion', type: 'blaster_fire_rate', amount: 150 },
+            blaster_lifetime: { kind: 'motion', type: 'blaster_lifetime', amount: 100 },
+            blaster_color: { kind: 'motion', type: 'blaster_color', color: '#ffff00' },
+            blaster_shoot: { kind: 'motion', type: 'blaster_shoot' },
             vehicle_speed: { kind: 'motion', type: 'vehicle_speed', amount: 1 },
             vehicle_turn: { kind: 'motion', type: 'vehicle_turn', amount: 0.04 },
             set_var: { kind: 'flow', type: 'set_var', name: 'score', value: '10' },
@@ -5357,11 +5405,19 @@ if(!edData.settings) edData.settings = { gravity: 0.35, skyColor: '#5b88a5', bri
             if (block.type === 'ui_message') return `ui message <input type="text" data-key="text" value="${(block.text || '').replace(/"/g, '&quot;')}">`;
             if (block.type === 'ui_notify') return `ui notify <input type="text" data-key="text" value="${(block.text || '').replace(/"/g, '&quot;')}">`;
             if (block.type === 'ui_create_label') return `ui create label <input type="text" data-key="id" value="${block.id}"> "<input type="text" data-key="text" value="${(block.text || '').replace(/"/g, '&quot;')}">" x <input type="number" data-key="x" value="${block.x}"> y <input type="number" data-key="y" value="${block.y}"> w <input type="number" data-key="w" value="${block.w}"> h <input type="number" data-key="h" value="${block.h}">`;
+            if (block.type === 'ui_create_button') return `ui create button <input type="text" data-key="id" value="${block.id}"> "<input type="text" data-key="text" value="${(block.text || '').replace(/"/g, '&quot;')}">" x <input type="number" data-key="x" value="${block.x}"> y <input type="number" data-key="y" value="${block.y}"> w <input type="number" data-key="w" value="${block.w}"> h <input type="number" data-key="h" value="${block.h}"> function <input type="text" data-key="functionName" value="${(block.functionName || '').replace(/"/g, '&quot;')}">`;
             if (block.type === 'ui_create_button') return `ui create button <input type="text" data-key="id" value="${block.id}"> "<input type="text" data-key="text" value="${(block.text || '').replace(/"/g, '&quot;')}">" x <input type="number" data-key="x" value="${block.x}"> y <input type="number" data-key="y" value="${block.y}"> w <input type="number" data-key="w" value="${block.w}"> h <input type="number" data-key="h" value="${block.h}"> event <input type="text" data-key="eventName" value="${(block.eventName || '').replace(/"/g, '&quot;')}">`;
             if (block.type === 'ui_create_bar') return `ui create bar <input type="text" data-key="id" value="${block.id}"> x <input type="number" data-key="x" value="${block.x}"> y <input type="number" data-key="y" value="${block.y}"> w <input type="number" data-key="w" value="${block.w}"> h <input type="number" data-key="h" value="${block.h}"> value <input type="number" data-key="value" value="${block.value}">`;
             if (block.type === 'ui_set_text') return `ui settext <input type="text" data-key="id" value="${block.id}"> "<input type="text" data-key="text" value="${(block.text || '').replace(/"/g, '&quot;')}">"`;
             if (block.type === 'ui_set_value') return `ui setvalue <input type="text" data-key="id" value="${block.id}"> <input type="number" data-key="value" value="${block.value}">`;
             if (block.type === 'ui_visible') return `ui visible <input type="text" data-key="id" value="${block.id}"> <select data-key="visible"><option value="1" ${String(block.visible) === '1' ? 'selected' : ''}>show</option><option value="0" ${String(block.visible) === '0' ? 'selected' : ''}>hide</option></select>`;
+            if (block.type === 'blaster_damage') return `blaster damage <input type="number" data-key="amount" value="${block.amount}">`;
+            if (block.type === 'blaster_speed') return `blaster speed <input type="number" step="0.1" data-key="amount" value="${block.amount}">`;
+            if (block.type === 'blaster_spread') return `blaster spread <input type="number" step="0.01" data-key="amount" value="${block.amount}">`;
+            if (block.type === 'blaster_fire_rate') return `blaster firerate <input type="number" step="1" data-key="amount" value="${block.amount}"> ms`;
+            if (block.type === 'blaster_lifetime') return `blaster lifetime <input type="number" step="1" data-key="amount" value="${block.amount}">`;
+            if (block.type === 'blaster_color') return `blaster color <input type="color" data-key="color" value="${block.color}">`;
+            if (block.type === 'blaster_shoot') return `<strong>blaster shoot</strong>`;
             if (block.type === 'vehicle_speed') return `vehicle speed <input type="number" step="0.1" data-key="amount" value="${block.amount}">`;
             if (block.type === 'vehicle_turn') return `vehicle turn <input type="number" step="0.01" data-key="amount" value="${block.amount}">`;
             if (block.type === 'set_var') return `set <input type="text" data-key="name" value="${(block.name || '').replace(/"/g, '&quot;')}"> = <input type="text" data-key="value" value="${(block.value || '').replace(/"/g, '&quot;')}">`;
@@ -5389,11 +5445,19 @@ if(!edData.settings) edData.settings = { gravity: 0.35, skyColor: '#5b88a5', bri
             if (block.type === 'ui_message') return `ui message "${(block.text || '').replace(/"/g, '\\"')}"`;
             if (block.type === 'ui_notify') return `ui notify "${(block.text || '').replace(/"/g, '\\"')}"`;
             if (block.type === 'ui_create_label') return `ui create label ${block.id || 'hud_label'} "${(block.text || '').replace(/"/g, '\\"')}" ${block.x || 0} ${block.y || 0} ${block.w || 180} ${block.h || 32}`;
+            if (block.type === 'ui_create_button') return `ui create button ${block.id || 'hud_button'} "${(block.text || '').replace(/"/g, '\\"')}" ${block.x || 0} ${block.y || 0} ${block.w || 140} ${block.h || 34} ${block.functionName || 'onButtonPressed'}`;
             if (block.type === 'ui_create_button') return `ui create button ${block.id || 'hud_button'} "${(block.text || '').replace(/"/g, '\\"')}" ${block.x || 0} ${block.y || 0} ${block.w || 140} ${block.h || 34} ${block.eventName || 'ui_button_press'}`;
             if (block.type === 'ui_create_bar') return `ui create bar ${block.id || 'hud_bar'} ${block.x || 0} ${block.y || 0} ${block.w || 220} ${block.h || 20} ${block.value || 100}`;
             if (block.type === 'ui_set_text') return `ui settext ${block.id || 'hud_label'} "${(block.text || '').replace(/"/g, '\\"')}"`;
             if (block.type === 'ui_set_value') return `ui setvalue ${block.id || 'hud_bar'} ${block.value || 0}`;
             if (block.type === 'ui_visible') return `ui visible ${block.id || 'hud_label'} ${parseFloat(block.visible) > 0 ? 1 : 0}`;
+            if (block.type === 'blaster_damage') return `blaster damage ${block.amount || 20}`;
+            if (block.type === 'blaster_speed') return `blaster speed ${block.amount || 2.5}`;
+            if (block.type === 'blaster_spread') return `blaster spread ${block.amount || 0}`;
+            if (block.type === 'blaster_fire_rate') return `blaster firerate ${block.amount || 150}`;
+            if (block.type === 'blaster_lifetime') return `blaster lifetime ${block.amount || 100}`;
+            if (block.type === 'blaster_color') return `blaster color ${block.color || '#ffff00'}`;
+            if (block.type === 'blaster_shoot') return `blaster shoot`;
             if (block.type === 'vehicle_speed') return `vehicle speed ${block.amount || 1}`;
             if (block.type === 'vehicle_turn') return `vehicle turn ${block.amount || 0.04}`;
             if (block.type === 'set_var') return `set ${block.name || 'score'} = ${block.value || '0'}`;
@@ -5454,6 +5518,10 @@ if(!edData.settings) edData.settings = { gravity: 0.35, skyColor: '#5b88a5', bri
                 const del = document.createElement('button');
                 del.className = 'sculptscript-delete';
                 del.textContent = 'Delete';
+                del.onclick = () => { sculptscriptBlocks.splice(idx, 1); renderSculptScriptWorkspace(); recordEdit(); };
+                row.appendChild(del);
+
+                row.querySelectorAll('input, select').forEach((input) => {
                 del.onclick = () => { sculptscriptBlocks.splice(idx, 1); renderSculptScriptWorkspace(); };
                 row.appendChild(del);
 
@@ -5464,6 +5532,7 @@ if(!edData.settings) edData.settings = { gravity: 0.35, skyColor: '#5b88a5', bri
                         const isNumber = e.target.type === 'number';
                         block[key] = isNumber ? parseFloat(e.target.value || '0') : e.target.value;
                         document.getElementById('sculptscript-preview').value = compileSculptScriptBlocks();
+                        recordEdit();
                     });
                 });
 
@@ -5475,6 +5544,9 @@ if(!edData.settings) edData.settings = { gravity: 0.35, skyColor: '#5b88a5', bri
         const addSculptScriptBlock = (type) => {
             sculptscriptBlocks.push(createSculptScriptBlock(type));
             renderSculptScriptWorkspace();
+            recordEdit();
+        };
+        window.addSculptScriptBlock = addSculptScriptBlock;
         };
 
         const loadSculptScriptBlocks = (scriptText) => {
@@ -5506,6 +5578,7 @@ if(!edData.settings) edData.settings = { gravity: 0.35, skyColor: '#5b88a5', bri
                 }
                 else if (lower.startsWith('ui create button')) {
                     const m = line.match(/^ui create button\s+(\S+)\s+"([^"]*)"\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+(\S+)/i);
+                    if (m) blocks.push(createSculptScriptBlock('ui_create_button', { id: m[1], text: m[2], x: parseFloat(m[3]), y: parseFloat(m[4]), w: parseFloat(m[5]), h: parseFloat(m[6]), functionName: m[7] }));
                     if (m) blocks.push(createSculptScriptBlock('ui_create_button', { id: m[1], text: m[2], x: parseFloat(m[3]), y: parseFloat(m[4]), w: parseFloat(m[5]), h: parseFloat(m[6]), eventName: m[7] }));
                     else blocks.push(createSculptScriptBlock('custom', { command: line }));
                 }
@@ -5525,6 +5598,13 @@ if(!edData.settings) edData.settings = { gravity: 0.35, skyColor: '#5b88a5', bri
                     const p = line.split(/\s+/);
                     blocks.push(createSculptScriptBlock('ui_visible', { id: p[2] || 'hud_label', visible: parseFloat(p[3]) || 0 }));
                 }
+                else if (lower.startsWith('blaster damage')) blocks.push(createSculptScriptBlock('blaster_damage', { amount: parseFloat(line.split(/\s+/)[2]) || 20 }));
+                else if (lower.startsWith('blaster speed')) blocks.push(createSculptScriptBlock('blaster_speed', { amount: parseFloat(line.split(/\s+/)[2]) || 2.5 }));
+                else if (lower.startsWith('blaster spread')) blocks.push(createSculptScriptBlock('blaster_spread', { amount: parseFloat(line.split(/\s+/)[2]) || 0 }));
+                else if (lower.startsWith('blaster firerate')) blocks.push(createSculptScriptBlock('blaster_fire_rate', { amount: parseFloat(line.split(/\s+/)[2]) || 150 }));
+                else if (lower.startsWith('blaster lifetime')) blocks.push(createSculptScriptBlock('blaster_lifetime', { amount: parseFloat(line.split(/\s+/)[2]) || 100 }));
+                else if (lower.startsWith('blaster color')) blocks.push(createSculptScriptBlock('blaster_color', { color: line.split(/\s+/)[2] || '#ffff00' }));
+                else if (lower.startsWith('blaster shoot')) blocks.push(createSculptScriptBlock('blaster_shoot'));
                 else if (lower.startsWith('vehicle speed')) blocks.push(createSculptScriptBlock('vehicle_speed', { amount: parseFloat(line.split(/\s+/)[2]) || 1 }));
                 else if (lower.startsWith('vehicle turn')) blocks.push(createSculptScriptBlock('vehicle_turn', { amount: parseFloat(line.split(/\s+/)[2]) || 0.04 }));
                 else if (lower.startsWith('set ')) {
@@ -5791,16 +5871,44 @@ mesh.userData = {
             teamSyncInterval = setInterval(async () => {
                 if(!currentEditGameId || !currentUser) return;
                 try {
-                    const res = await apiCall(`/games/${currentEditGameId}/sync`, 'POST', { gameData: edData, genre: document.getElementById('editor-genre').value, lastLocalEditTime: lastLocalEditTime, cursor: null });
+                    const collabCursor = selectedObjects[0] ? { x: selectedObjects[0].position.x, y: selectedObjects[0].position.y, z: selectedObjects[0].position.z } : { x: edCamera.position.x, y: edCamera.position.y, z: edCamera.position.z };
+                    const res = await apiCall(`/games/${currentEditGameId}/sync`, 'POST', { gameData: edData, genre: document.getElementById('editor-genre').value, lastLocalEditTime: lastLocalEditTime, cursor: collabCursor });
                     if (!res.acceptedLocalUpdate && res.lastEditTime > lastLocalEditTime) {
                         edData = res.gameData; lastLocalEditTime = res.lastEditTime; buildEditorScene();
                     }
+                    renderCollaboratorCursors((res.cursors || res.teamCursors || res.collaborators || []).filter(c => c && c.username && c.username !== currentUser.username));
                     const status = document.getElementById('autosave-status');
                     if (status && lastLocalEditTime > 0) { status.innerText = 'Autosaved'; setTimeout(() => status.innerText = '', 1000); }
                 } catch(e) {}
             }, 1500); 
         };
-        const stopTeamSync = () => { if (teamSyncInterval) clearInterval(teamSyncInterval); };
+        const stopTeamSync = () => {
+            if (teamSyncInterval) clearInterval(teamSyncInterval);
+            Object.keys(collabMeshes).forEach(k => { if (collabMeshes[k] && collabMeshes[k].parent) collabMeshes[k].parent.remove(collabMeshes[k]); delete collabMeshes[k]; });
+        };
+
+        const renderCollaboratorCursors = (cursors) => {
+            if (!edScene) return;
+            const alive = new Set();
+            (cursors || []).forEach(c => {
+                const key = c.userId || c.username;
+                alive.add(key);
+                if (!collabMeshes[key]) {
+                    const ghost = new THREE.Mesh(new THREE.SphereGeometry(0.6, 12, 12), new THREE.MeshBasicMaterial({ color: 0x00e5ff }));
+                    ghost.userData.isCollabGhost = true;
+                    ghost.renderOrder = 999;
+                    edScene.add(ghost);
+                    collabMeshes[key] = ghost;
+                }
+                collabMeshes[key].position.set(c.cursor?.x || 0, (c.cursor?.y || 0) + 1.2, c.cursor?.z || 0);
+            });
+            Object.keys(collabMeshes).forEach(key => {
+                if (!alive.has(key)) {
+                    if (collabMeshes[key] && collabMeshes[key].parent) collabMeshes[key].parent.remove(collabMeshes[key]);
+                    delete collabMeshes[key];
+                }
+            });
+        };
         const promptAddCollaborator = () => {
             showModal('Add Collaborator', 'Enter username to build with:', 'Invite', async (username) => {
                 if(!username) return; try { const res = await apiCall(`/games/${currentEditGameId}/collaborators`, 'POST', { username }); showModal('Success', res.message); } catch(e) {}
@@ -5816,6 +5924,7 @@ playerObj = {
         vx: 0, vy: 0, vz: 0, rotY: 0,
         speed: 0.2, jump: 3.8,
         health: 100, // ADD THIS
+        blasterDamage: 20, blasterSpeed: 2.5, blasterSpread: 0, blasterFireRate: 150, blasterLifetime: 100, blasterColor: '#ffff00', lastShotAt: 0,
         grounded: false, sitting: false, seatCooldown: 0
     };
         let activeLevel = null, currentPlayGameId = null; 
@@ -6176,6 +6285,7 @@ window.playControls.mouseButtons = { LEFT: THREE.MOUSE.NONE, MIDDLE: THREE.MOUSE
             playerObj.speed = 0.2;
 playerObj.jump = 0.6;
             playerObj.health = 100;
+            playerObj.blasterDamage = 20; playerObj.blasterSpeed = 2.5; playerObj.blasterSpread = 0; playerObj.blasterFireRate = 150; playerObj.blasterLifetime = 100; playerObj.blasterColor = '#ffff00'; playerObj.lastShotAt = 0;
             playerObj.sitting = false;
             playerObj.vehicleSeat = null;
             playerObj.seatCooldown = 0;
@@ -7026,15 +7136,55 @@ const animatePlay = () => {
                     
                     terrain: (activeLevel.terrain && activeLevel.terrain.active && window.playTerrainMesh) ? { mesh: window.playTerrainMesh, heights: activeLevel.terrain.heights, colors: activeLevel.terrain.colors, res: activeLevel.terrain.res, size: activeLevel.terrain.size, update: () => { const posAttr = window.playTerrainMesh.geometry.attributes.position; const colAttr = window.playTerrainMesh.geometry.attributes.color; for (let i = 0; i < posAttr.count; i++) { posAttr.setY(i, activeLevel.terrain.heights[i]); colAttr.setXYZ(i, activeLevel.terrain.colors[i*3], activeLevel.terrain.colors[i*3+1], activeLevel.terrain.colors[i*3+2]); } posAttr.needsUpdate = true; colAttr.needsUpdate = true; window.playTerrainMesh.geometry.computeVertexNormals(); } } : null,
                     makeOcean: (speed, height) => { if (!ctx.terrain) return; const res = ctx.terrain.res; for (let x = 0; x < res; x++) { for (let z = 0; z < res; z++) { const idx = z * res + x; ctx.terrain.heights[idx] = Math.sin((x * 0.5) + (time * speed)) * height + Math.cos((z * 0.5) + (time * speed)) * height; ctx.terrain.colors[idx*3] = 0.1; ctx.terrain.colors[idx*3+1] = 0.6; ctx.terrain.colors[idx*3+2] = 0.9; } } ctx.terrain.update(); },
-                    shoot: (colorHex, speed) => { const bullet = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshBasicMaterial({color: colorHex})); bullet.position.set(playerObj.x, playerObj.y + 4, playerObj.z); const dirX = Math.sin(playerObj.rotY); const dirZ = Math.cos(playerObj.rotY); bullet.position.x += dirX * 3; bullet.position.z += dirZ * 3; bullet.userData.velocity = new THREE.Vector3(dirX * speed, 0, dirZ * speed); bullet.userData.lifetime = 100; playScene.add(bullet); if (!window.activeBullets) window.activeBullets = []; window.activeBullets.push(bullet); },
+                    shoot: (colorHex, speed, options = {}) => {
+                        const now = Date.now();
+                        const fireRate = parseFloat(options.fireRate || playerObj.blasterFireRate || 150);
+                        if (now - (playerObj.lastShotAt || 0) < fireRate) return;
+                        playerObj.lastShotAt = now;
+                        const bullet = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshBasicMaterial({color: colorHex}));
+                        bullet.position.set(playerObj.x, playerObj.y + 4, playerObj.z);
+                        let dirX = Math.sin(playerObj.rotY);
+                        let dirZ = Math.cos(playerObj.rotY);
+                        const spread = parseFloat(options.spread || playerObj.blasterSpread || 0);
+                        dirX += (Math.random() - 0.5) * spread;
+                        dirZ += (Math.random() - 0.5) * spread;
+                        const len = Math.max(0.0001, Math.sqrt(dirX*dirX + dirZ*dirZ));
+                        dirX /= len; dirZ /= len;
+                        bullet.position.x += dirX * 3; bullet.position.z += dirZ * 3;
+                        bullet.userData.velocity = new THREE.Vector3(dirX * speed, 0, dirZ * speed);
+                        bullet.userData.lifetime = parseFloat(options.lifetime || playerObj.blasterLifetime || 100);
+                        bullet.userData.damage = parseFloat(options.damage || playerObj.blasterDamage || 20);
+                        bullet.userData.owner = currentUser ? currentUser.username : 'local';
+                        playScene.add(bullet);
+                        if (!window.activeBullets) window.activeBullets = [];
+                        window.activeBullets.push(bullet);
+                    },
                     playSound: async (soundId, volume = 0.5) => { if (!window.audioCache) window.audioCache = {}; const now = Date.now(); if (window.audioCache[soundId] && window.audioCache[soundId].lastPlayed) { if (now - window.audioCache[soundId].lastPlayed < 100) return; } if (!window.audioCache[soundId] || !window.audioCache[soundId].data) { try { const token = localStorage.getItem('ps_token'); const res = await fetch(API_BASE + `/sounds/${soundId}`, { headers: { 'Authorization': token } }); const data = await res.json(); window.audioCache[soundId] = { data: data.data, lastPlayed: 0 }; } catch(e) { return; } } window.audioCache[soundId].lastPlayed = now; const a = new Audio(window.audioCache[soundId].data); a.volume = volume; if (!window.activeAudioObjects) window.activeAudioObjects = []; window.activeAudioObjects.push(a); a.onended = () => { window.activeAudioObjects = window.activeAudioObjects.filter(x => x !== a); }; a.play().catch(e => {}); }
                 };
                 playCamera.getWorldDirection(ctx.cameraDir);
+                if (playInput.justClicked && equippedToolIndex !== -1) {
+                    ctx.shoot(playerObj.blasterColor || '#ffff00', playerObj.blasterSpeed || 2.5, {
+                        damage: playerObj.blasterDamage || 20,
+                        spread: playerObj.blasterSpread || 0,
+                        lifetime: playerObj.blasterLifetime || 100,
+                        fireRate: playerObj.blasterFireRate || 150
+                    });
+                }
 
                 if (window.activeBullets) {
                     window.activeBullets = window.activeBullets.filter(b => {
                         b.position.add(b.userData.velocity); b.userData.lifetime--; let hitSomething = false;
                         playScene.children.forEach(obj => { if (obj.userData && obj.userData.id && !obj.userData.isSpawn && !obj.userData.isTool && obj !== b) { if (b.position.distanceTo(obj.position) < 1.5) { playScene.remove(obj); obj.position.y = -9999; hitSomething = true; } } });
+                        if (!hitSomething && b.position.distanceTo(new THREE.Vector3(playerObj.x, playerObj.y + 3, playerObj.z)) < 1.3 && b.userData.owner !== (currentUser ? currentUser.username : 'local')) {
+                            damagePlayer(b.userData.damage || 20);
+                            hitSomething = true;
+                        }
+                        if (!hitSomething) {
+                            for (const id in otherPlayerMeshes) {
+                                const op = otherPlayerMeshes[id];
+                                if (op && op.mesh && b.position.distanceTo(op.mesh.position) < 1.3) { hitSomething = true; break; }
+                            }
+                        }
                         if (b.userData.lifetime <= 0 || hitSomething) { playScene.remove(b); return false; } return true;
                     });
                 }
