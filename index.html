@@ -5139,6 +5139,168 @@ if(!edData.settings) edData.settings = { gravity: 0.35, skyColor: '#5b88a5', bri
             });
         };
 
+        const ensureUILayout = () => {
+            if (!edData.uiLayout) edData.uiLayout = [];
+            return edData.uiLayout;
+        };
+
+        const toggleUIDesigner = (force) => {
+            const panel = document.getElementById('ui-designer-panel');
+            const show = typeof force === 'boolean' ? force : panel.style.display !== 'block';
+            panel.style.display = show ? 'block' : 'none';
+            if (show) renderUIDesigner();
+        };
+        window.toggleUIDesigner = toggleUIDesigner;
+
+        const renderUIDesigner = () => {
+            const canvas = document.getElementById('ui-designer-canvas');
+            const list = document.getElementById('ui-designer-list');
+            if (!canvas || !list) return;
+            const layout = ensureUILayout();
+            canvas.innerHTML = '';
+            list.innerHTML = layout.length ? '' : '<p style="color:#aaa; font-size:12px;">No UI elements yet.</p>';
+
+            layout.forEach((item, idx) => {
+                const box = document.createElement('div');
+                box.style.position = 'absolute';
+                box.style.left = `${item.x || 0}px`;
+                box.style.top = `${item.y || 0}px`;
+                box.style.width = `${item.w || 100}px`;
+                box.style.height = `${item.h || 32}px`;
+                box.style.background = item.bg || '#2980b9';
+                box.style.color = item.color || '#fff';
+                box.style.border = '1px solid rgba(255,255,255,0.35)';
+                box.style.borderRadius = '6px';
+                box.style.display = 'flex';
+                box.style.alignItems = 'center';
+                box.style.justifyContent = 'center';
+                box.style.fontSize = '12px';
+                box.style.padding = '2px 6px';
+                box.style.boxSizing = 'border-box';
+                box.innerText = item.type === 'bar' ? `${item.id}: ${item.value ?? 100}%` : (item.text || item.id);
+                canvas.appendChild(box);
+
+                list.innerHTML += `<div style="display:flex; gap:6px; align-items:center; justify-content:space-between; background:#1d1d1d; border:1px solid #333; border-radius:6px; padding:6px; margin-bottom:6px;">
+                    <div style="font-size:12px;"><strong>${item.id}</strong> <span style="color:#9fb;">(${item.type})</span> @ ${item.x},${item.y}</div>
+                    <button class="btn btn-sm btn-danger" onclick="deleteUIElement(${idx})">Delete</button>
+                </div>`;
+            });
+        };
+
+        const addUIElementFromDesigner = () => {
+            const type = document.getElementById('ui-item-type').value;
+            const id = document.getElementById('ui-item-id').value.trim() || `ui_${Date.now()}`;
+            const text = document.getElementById('ui-item-text').value.trim() || (type === 'button' ? 'Click' : 'Label');
+            const x = parseFloat(document.getElementById('ui-item-x').value || '0');
+            const y = parseFloat(document.getElementById('ui-item-y').value || '0');
+            const w = parseFloat(document.getElementById('ui-item-width').value || '160');
+            const h = parseFloat(document.getElementById('ui-item-height').value || '34');
+            const color = document.getElementById('ui-item-color').value;
+            const bg = document.getElementById('ui-item-bg').value;
+            const onClickEvent = document.getElementById('ui-item-event').value.trim();
+            const value = type === 'bar' ? 100 : null;
+
+            ensureUILayout().push({ id, type, text, x, y, w, h, color, bg, onClickEvent, value, visible: true });
+            recordEdit();
+            renderUIDesigner();
+        };
+        window.addUIElementFromDesigner = addUIElementFromDesigner;
+
+        const deleteUIElement = (idx) => {
+            ensureUILayout().splice(idx, 1);
+            recordEdit();
+            renderUIDesigner();
+        };
+        window.deleteUIElement = deleteUIElement;
+
+        const uiRuntimeManager = window.uiRuntimeManager = {
+            elements: {},
+            build(layout = []) {
+                const layer = document.getElementById('runtime-ui-layer');
+                if (!layer) return;
+                layer.innerHTML = '';
+                this.elements = {};
+                layout.forEach((item) => {
+                    const el = document.createElement('div');
+                    el.dataset.uiid = item.id;
+                    el.style.position = 'absolute';
+                    el.style.left = `${item.x || 0}px`;
+                    el.style.top = `${item.y || 0}px`;
+                    el.style.width = `${item.w || 160}px`;
+                    el.style.height = `${item.h || 34}px`;
+                    el.style.color = item.color || '#fff';
+                    el.style.background = item.bg || 'rgba(0,0,0,0.35)';
+                    el.style.display = item.visible === false ? 'none' : 'flex';
+                    el.style.alignItems = 'center';
+                    el.style.justifyContent = 'center';
+                    el.style.fontWeight = '700';
+                    el.style.border = '1px solid rgba(255,255,255,0.35)';
+                    el.style.borderRadius = '7px';
+                    el.style.boxSizing = 'border-box';
+                    el.style.pointerEvents = item.type === 'button' ? 'auto' : 'none';
+                    el.style.userSelect = 'none';
+                    if (item.type === 'bar') {
+                        const fill = document.createElement('div');
+                        fill.style.height = '100%';
+                        fill.style.width = `${item.value ?? 100}%`;
+                        fill.style.background = '#2ecc71';
+                        fill.style.borderRadius = '7px';
+                        el.appendChild(fill);
+                    } else {
+                        el.textContent = item.text || item.id;
+                    }
+                    if (item.type === 'button' && item.onClickEvent) {
+                        el.addEventListener('click', () => {
+                            playMeshes.forEach(m => {
+                                if (m.userData && m.userData.sculptEngine) m.userData.sculptEngine.triggerEvent(item.onClickEvent);
+                            });
+                        });
+                    }
+                    layer.appendChild(el);
+                    this.elements[item.id] = { cfg: item, node: el };
+                });
+            },
+            setText(id, text) {
+                const item = this.elements[id];
+                if (!item) return;
+                if (item.cfg.type !== 'bar') item.node.textContent = text;
+            },
+            setValue(id, value) {
+                const item = this.elements[id];
+                if (!item || item.cfg.type !== 'bar') return;
+                const v = Math.max(0, Math.min(100, parseFloat(value) || 0));
+                if (item.node.firstChild) item.node.firstChild.style.width = `${v}%`;
+            },
+            setVisible(id, visible) {
+                const item = this.elements[id];
+                if (!item) return;
+                item.node.style.display = visible ? 'flex' : 'none';
+            },
+            create(type, id, text, x, y, w = 160, h = 34, extra = '') {
+                const layout = ensureUILayout();
+                if (layout.some(i => i.id === id)) return;
+                layout.push({ id, type, text, x: parseFloat(x)||0, y: parseFloat(y)||0, w: parseFloat(w)||160, h: parseFloat(h)||34, color: '#fff', bg: '#34495e', onClickEvent: extra || '', value: 100, visible: true });
+                this.build(layout);
+            }
+        };
+
+        const updatePlayerHealthHUD = () => {
+            const maxHealth = 100;
+            if (typeof playerObj.health !== 'number') playerObj.health = maxHealth;
+            playerObj.health = Math.max(0, Math.min(maxHealth, playerObj.health));
+            const pct = (playerObj.health / maxHealth) * 100;
+            const fill = document.getElementById('player-health-fill');
+            const label = document.getElementById('player-health-label');
+            if (fill) fill.style.width = `${pct}%`;
+            if (label) label.innerText = `${Math.round(playerObj.health)} / ${maxHealth}`;
+            if (playerObj.health <= 0) startGame();
+        };
+
+        const damagePlayer = (amount) => {
+            playerObj.health = Math.max(0, (playerObj.health || 100) - (parseFloat(amount) || 0));
+            updatePlayerHealthHUD();
+        };
+
         let sculptscriptBlocks = [];
         let dragBlockIndex = -1;
 
